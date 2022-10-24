@@ -142,6 +142,15 @@ public:
     int    port;
   };
 
+  class Web {
+    public:
+    Web(): active(false), port(80){
+    }
+
+    bool  active;
+    int   port;
+  };
+
   Configuration() : callsign("NOCALL-10"), ntpServer("pool.ntp.org"), board("") {
   }
 
@@ -156,6 +165,7 @@ public:
   Ftp     ftp;
   MQTT    mqtt;
   Syslog  syslog;
+  Web     web;
   String  ntpServer;
   String  board;
 };

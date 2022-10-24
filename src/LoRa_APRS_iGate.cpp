@@ -19,6 +19,7 @@
 #include "TaskRadiolib.h"
 #include "TaskRouter.h"
 #include "TaskWifi.h"
+#include "TaskWeb.h"
 #include "project_configuration.h"
 
 #define VERSION     "22.20.0"
@@ -44,6 +45,7 @@ OTATask      otaTask;
 NTPTask      ntpTask;
 FTPTask      ftpTask;
 MQTTTask     mqttTask(toMQTT);
+WebTask     webTask;
 AprsIsTask   aprsIsTask(toAprsIs);
 RouterTask   routerTask(fromModem, toModem, toAprsIs, toMQTT);
 BeaconTask   beaconTask(toModem, toAprsIs);
@@ -139,6 +141,13 @@ void setup() {
 
     if (userConfig.mqtt.active) {
       LoRaSystem.getTaskManager().addTask(&mqttTask);
+    }
+
+    if(userConfig.web.active){
+      LoRaSystem.getLogger().log(logging::LoggerLevel::LOGGER_LEVEL_INFO, MODULE_NAME, "Web task added.");
+      LoRaSystem.getTaskManager().addTask(&webTask);
+    }else{
+      LoRaSystem.getLogger().log(logging::LoggerLevel::LOGGER_LEVEL_INFO, MODULE_NAME, "Web task inactive.");
     }
   }
 

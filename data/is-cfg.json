@@ -80,5 +80,9 @@
 		"server": "syslog.lora-aprs.info",
 		"port": 514
 	},
+	"webserver": {
+		"active": false,
+		"port": 80
+	},
 	"ntp_server": "pool.ntp.org"
 }

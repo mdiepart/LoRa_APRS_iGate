@@ -103,6 +103,13 @@ void ProjectConfigurationManagement::readProjectConfiguration(DynamicJsonDocumen
     conf.syslog.server = data["syslog"]["server"].as<String>();
   conf.syslog.port = data["syslog"]["port"] | 514;
 
+  if(data.containsKey("webserver")){
+    if(data["webserver"].containsKey("active"))
+      conf.web.active = data["webserver"]["active"] | false;
+    if(data["webserver"].containsKey("port"))
+      conf.web.port = data["webserver"]["port"] | 80;
+  }
+
   if (data.containsKey("ntp_server"))
     conf.ntpServer = data["ntp_server"].as<String>();
 
@@ -173,4 +180,8 @@ void ProjectConfigurationManagement::writeProjectConfiguration(Configuration &co
   data["ntp_server"]       = conf.ntpServer;
 
   data["board"] = conf.board;
+
+  data["webserver"]["active"] = conf.web.active;
+  data["webserver"]["port"] = conf.web.port;
+
 }
