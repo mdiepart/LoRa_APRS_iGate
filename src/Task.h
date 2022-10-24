@@ -14,8 +14,10 @@ enum TaskNames
   TaskRouter,
   TaskMQTT,
   TaskBeacon,
-  TaskSize,
   TaskWeb,
+  TaskWebClient1,
+  TastWebClient8 = TaskWebClient1+7, //Allocates 8 task IDs for 8 potential web clients
+  TaskSize,
 };
 
 #define TASK_APRS_IS  "AprsIsTask"
