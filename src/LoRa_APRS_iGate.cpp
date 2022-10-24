@@ -45,7 +45,7 @@ OTATask      otaTask;
 NTPTask      ntpTask;
 FTPTask      ftpTask;
 MQTTTask     mqttTask(toMQTT);
-WebTask     webTask;
+WebTask      webTask;
 AprsIsTask   aprsIsTask(toAprsIs);
 RouterTask   routerTask(fromModem, toModem, toAprsIs, toMQTT);
 BeaconTask   beaconTask(toModem, toAprsIs);

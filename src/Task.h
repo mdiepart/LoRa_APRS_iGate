@@ -29,6 +29,6 @@ enum TaskNames
 #define TASK_ROUTER   "RouterTask"
 #define TASK_MQTT     "MQTTTask"
 #define TASK_BEACON   "BeaconTask"
-#define TASK_WEB     "WebTask"
+#define TASK_WEB      "WebTask"
 
 #endif
