@@ -14,6 +14,7 @@ public:
 
 private:
   WiFiServer http_server;
+  const unsigned int TIMEOUT = 20000; // Timeout in ms
 };
 
 #endif

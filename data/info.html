@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="icon" href="data:,">
+    <style>
+        html {
+            font-family: Helvetica;
+            display: inline-block;
+            margin: 0px auto;
+            text-align: center;
+        }
+
+        .button {
+            background-color: #4CAF50;
+            border: none;
+            color: white;
+            padding: 16px 40px;
+            text-decoration: none;
+            font-size: 30px;
+            margin: 2px;
+            cursor: pointer;
+        }
+
+        .button2 {
+            background-color: #555555;
+        }
+
+    </style>
+</head>
+
+<body>
+    <h1>iGate Web Server</h1>
+    <p>Connected to LoRa iGate.</p>
+    <h2>Status:</h2>
+    <p>Device callsign: $$CALLSIGN$$</p>
+    <p>Device IP: $$IP$$</p>
+    <p>AP connected: $$AP$$. RSSI is $$RSSI$$</p>
+
+    <h2>OTA</h2>
+    <form action="/enableOTA" method="post">
+        <label for="OTA_Password">OTA Password:</label><br>
+        <input type="password" id="OTA_Password" name="OTA_Password"><br>
+        <input type="submit" value="Enable OTA">
+    </form>
+</body>
+
+</html>
