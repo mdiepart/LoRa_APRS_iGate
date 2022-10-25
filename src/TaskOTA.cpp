@@ -96,14 +96,26 @@ bool OTATask::loop(System &system) {
   return true;
 }
 
-  OTATask::Status OTATask::GetOTAStatus(){
-    return _status;
-  }
+OTATask::Status OTATask::getOTAStatus(){
+  return _status;
+}
 
-  void OTATask::enableOTA(unsigned int timeout){
-    if(_status == OTA_Disabled || _status == OTA_Enabled){
-      _enable_time = millis();
-      _timeout = timeout;
-      _status = OTA_Enabled;
-    }
+void OTATask::enableOTA(unsigned int timeout){
+  if(_status == OTA_Disabled || _status == OTA_Enabled){
+    _enable_time = millis();
+    _timeout = timeout;
+    _status = OTA_Enabled;
   }
+}
+
+/**
+ * @brief Returns the time remaining before OTA times out and disables itself
+ * 
+ * @return unsigned int the time left in milliseconds
+ */
+unsigned int OTATask::getTimeRemaining(){
+  if(_status == OTA_Enabled){
+    return (unsigned long)_timeout-millis()+_enable_time;
+  }
+  return 0;
+}

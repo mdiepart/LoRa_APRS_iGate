@@ -19,6 +19,7 @@ bool WebTask::setup(System &system) {
   
   http_server.begin();
 
+  _stateInfo = "Online";
   return true;
 }
 
@@ -88,6 +89,52 @@ bool WebTask::loop(System &system) {
         page.replace("$$IP$$", client.localIP().toString() + ":" +String(client.localPort()));
         page.replace("$$AP$$", WiFi.SSID());
         page.replace("$$RSSI$$", String(WiFi.RSSI()) + "dBm");
+
+        //Build $$TASKLIST$$ string
+        String tasklist = "";
+        for(Task *task : system.getTaskManager().getTasks()){
+          switch(task->getTaskId()){
+            case TaskOta:
+              switch(((OTATask *)task)->getOTAStatus()){
+                case OTATask::Status::OTA_ForceDisabled:
+                  tasklist += "<p class=\"task\">" + task->getName() + ": Disabled.</p>";
+                  break;
+                case OTATask::Status::OTA_ForceEnabled:
+                  tasklist += "<p class=\"task ok\">" + task->getName() + ": Enabled.</p>";
+                  break;
+                case OTATask::Status::OTA_Disabled:
+                  tasklist += "<p class=\"task warning\">" + task->getName() + ": Disabled. Use web interface to enable.</p>";
+                  break;
+                case OTATask::Status::OTA_Enabled:
+                  tasklist += "<p class=\"task ok\">" + task->getName() + ": Enabled for ";
+                  unsigned int seconds = ((OTATask *)task)->getTimeRemaining()/1000;
+                  tasklist += String(seconds) + " more seconds.</p>";
+                  break;
+              }
+              break;
+            case TaskWifi:
+                tasklist += "<p class=\"task ok\">" + 
+                            task->getName() + ": connected to AP \"" +
+                            WiFi.SSID() + "\". RSSI is " + String(WiFi.RSSI()) + "dBm "
+                            "and IP is " + WiFi.localIP().toString().c_str() + ".</p>";
+              break;
+            default:
+              switch(task->getState()){
+                case TaskDisplayState::Okay:
+                  tasklist += "<p class=\"task ok\">";
+                  break;
+                case TaskDisplayState::Warning:
+                  tasklist += "<p class=\"task warning\">";
+                  break;
+                case TaskDisplayState::Error:
+                  tasklist += "<p class=\"task error\">";
+                  break;
+              }
+            tasklist += task->getName() + ": " + task->getStateInfo() + "</p>";
+          }
+        }
+
+        page.replace("$$TASKLIST$$", tasklist);
 
         page.trim();
         client.println(page);

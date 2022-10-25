@@ -20,7 +20,8 @@ public:
   };
 
   Status        getOTAStatus();
-  void enableOTA(unsigned int timeout);
+  void          enableOTA(unsigned int timeout);
+  unsigned int  getTimeRemaining();
 
 
 private:
