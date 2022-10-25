@@ -82,7 +82,14 @@
 	},
 	"webserver": {
 		"active": false,
-		"port": 80
+		"port": 80,
+		"OTAPassword": "OTAWebPassword"
+	},
+	"OTA": {
+		"active": false,
+		"enableViaWeb": false,
+		"port": 3232,
+		"password": ""
 	},
 	"ntp_server": "pool.ntp.org"
 }

@@ -108,6 +108,19 @@ void ProjectConfigurationManagement::readProjectConfiguration(DynamicJsonDocumen
       conf.web.active = data["webserver"]["active"] | false;
     if(data["webserver"].containsKey("port"))
       conf.web.port = data["webserver"]["port"] | 80;
+    if(data["webserver"].containsKey("OTAPassword"))
+      conf.web.otaPassword = data["webserver"]["OTAPassword"] | "";
+  }
+
+  if(data.containsKey("OTA")){
+    if(data["OTA"].containsKey("active"))
+      conf.ota.active = data["OTA"]["active"] | false;
+    if(data["OTA"].containsKey("port"))
+      conf.ota.port = data["OTA"]["port"] | 3232;
+    if(data["OTA"].containsKey("password"))
+      conf.ota.password = data["OTA"]["password"] | "";
+    if(data["OTA"].containsKey("enableViaWeb"))
+      conf.ota.enableViaWeb = data["OTA"]["enableViaWeb"] | false;
   }
 
   if (data.containsKey("ntp_server"))
@@ -168,20 +181,27 @@ void ProjectConfigurationManagement::writeProjectConfiguration(Configuration &co
     v["name"]     = u.name;
     v["password"] = u.password;
   }
-  data["mqtt"]["active"]   = conf.mqtt.active;
-  data["mqtt"]["server"]   = conf.mqtt.server;
-  data["mqtt"]["port"]     = conf.mqtt.port;
-  data["mqtt"]["name"]     = conf.mqtt.name;
-  data["mqtt"]["password"] = conf.mqtt.password;
-  data["mqtt"]["topic"]    = conf.mqtt.topic;
-  data["syslog"]["active"] = conf.syslog.active;
-  data["syslog"]["server"] = conf.syslog.server;
-  data["syslog"]["port"]   = conf.syslog.port;
-  data["ntp_server"]       = conf.ntpServer;
+  data["mqtt"]["active"]                  = conf.mqtt.active;
+  data["mqtt"]["server"]                  = conf.mqtt.server;
+  data["mqtt"]["port"]                    = conf.mqtt.port;
+  data["mqtt"]["name"]                    = conf.mqtt.name;
+  data["mqtt"]["password"]                = conf.mqtt.password;
+  data["mqtt"]["topic"]                   = conf.mqtt.topic;
+  data["syslog"]["active"]                = conf.syslog.active;
+  data["syslog"]["server"]                = conf.syslog.server;
+  data["syslog"]["port"]                  = conf.syslog.port;
 
-  data["board"] = conf.board;
+  data["webserver"]["active"]             = conf.web.active;
+  data["webserver"]["port"]               = conf.web.port;
+  data["webserver"]["OTAPassword"]        = conf.web.otaPassword;
 
-  data["webserver"]["active"] = conf.web.active;
-  data["webserver"]["port"] = conf.web.port;
+  data["OTA"]["active"]                   = conf.ota.active;
+  data["OTA"]["port"]                     = conf.ota.port;
+  data["OTA"]["password"]                 = conf.ota.password;
+  data["OTA"]["enableViaWeb"]             = conf.ota.enableViaWeb;
+
+  data["ntp_server"]                      = conf.ntpServer;
+
+  data["board"]                           = conf.board;
 
 }

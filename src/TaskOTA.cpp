@@ -19,7 +19,7 @@ bool OTATask::setup(System &system) {
         } else { // U_SPIFFS
           type = "filesystem";
         }
-        system.getLogger().log(logging::LoggerLevel::LOGGER_LEVEL_INFO, getName(), "Start updating %s. please wait, this prozess is taking some time!", type.c_str());
+        system.getLogger().log(logging::LoggerLevel::LOGGER_LEVEL_INFO, getName(), "Start updating %s. please wait, this process is taking some time!", type.c_str());
       })
       .onEnd([&]() {
         system.getLogger().log(logging::LoggerLevel::LOGGER_LEVEL_INFO, getName(), "OTA End");
@@ -47,15 +47,63 @@ bool OTATask::setup(System &system) {
   } else {
     _ota.setHostname(system.getUserConfig()->callsign.c_str());
   }
-  _stateInfo = "";
+
+  if(!system.getUserConfig()->ota.password.isEmpty()){
+    _ota.setPassword(system.getUserConfig()->ota.password.c_str());
+    system.getLogger().log(logging::LoggerLevel::LOGGER_LEVEL_INFO, getName(), "Set OTA password to %s", system.getUserConfig()->ota.password.c_str());
+  }
+
+  _ota.setPort((uint16_t)system.getUserConfig()->ota.port);
+  system.getLogger().log(logging::LoggerLevel::LOGGER_LEVEL_INFO, getName(), "Set OTA port to %u", system.getUserConfig()->ota.port);
+
+  if(system.getUserConfig()->ota.active){
+    if(system.getUserConfig()->ota.enableViaWeb){
+      _stateInfo = "Web";
+      _status = OTA_Disabled;
+    }else{
+      _stateInfo = "Okay";
+      _status = OTA_ForceEnabled;
+    }
+  }else{
+      _stateInfo = "Disabled";
+      _status = OTA_ForceDisabled;
+  }
+
   return true;
 }
 
 bool OTATask::loop(System &system) {
-  if (!_beginCalled) {
+  
+  if(_status == OTA_Enabled && (millis()-_enable_time >= _timeout)){
+    _status = OTA_Disabled;
+    system.getLogger().log(logging::LoggerLevel::LOGGER_LEVEL_INFO, getName(), "OTA Timed out. Disabling OTA.");
+  }
+
+  if( !_beginCalled && (_status == OTA_ForceEnabled || _status == OTA_Enabled) ){
     _ota.begin();
     _beginCalled = true;
   }
-  _ota.handle();
+
+  if( _beginCalled && (_status == OTA_ForceDisabled || _status == OTA_Disabled) ){
+    _ota.end();
+    _beginCalled = false;
+  }
+
+  if( _beginCalled && (_status == OTA_ForceEnabled || _status == OTA_Enabled) ){
+    _ota.handle();
+  }
+
   return true;
 }
+
+  OTATask::Status OTATask::GetOTAStatus(){
+    return _status;
+  }
+
+  void OTATask::enableOTA(unsigned int timeout){
+    if(_status == OTA_Disabled || _status == OTA_Enabled){
+      _enable_time = millis();
+      _timeout = timeout;
+      _status = OTA_Enabled;
+    }
+  }

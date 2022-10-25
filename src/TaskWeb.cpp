@@ -2,6 +2,7 @@
 #include <logger.h>
 #include <SPIFFS.h>
 
+#include "TaskOTA.h"
 #include "Task.h"
 #include "TaskWeb.h"
 #include "project_configuration.h"
@@ -41,13 +42,14 @@ bool WebTask::loop(System &system) {
         header.trim();
         header += '\n';
       }
-      Serial.print(header);
 
-      if(header.indexOf("POST /nonexistant") == 0){
-        client.println("HTTP/1.0 404 Not Found");
-        client.println();
-      }else if(header.indexOf("POST /enableOTA") == 0){
-        if(header.indexOf("OTA_Password=password") > 0){
+      if(header.indexOf("POST /enableOTA") == 0){
+        if(header.indexOf("OTA_Password=") > 0){
+          int index = header.indexOf("OTA_Password=") + String("OTA_Password=").length();
+          int end_line = header.indexOf("\n", index);
+
+          String password = header.substring(index, end_line);
+          password.trim();
           client.println("HTTP/1.1 200 OK");
           client.println("Content-type:text/html");
           client.println("Connection: close");
@@ -57,11 +59,27 @@ bool WebTask::loop(System &system) {
           client.println("<link rel=\"icon\" href=\"data:,\">");
           client.println("<style>html { font-family: Helvetica; display: inline-block; margin: 0px auto; text-align: center;}</style></head>");
           client.println("<body><h1>iGate Web Server</h1>");
-          client.println("<p>OTA password is correct.</p>");
+          if(system.getUserConfig()->web.otaPassword.equals(password)){
+            client.println("<p>OTA password is correct.</p><p>OTA Enabled for 5 minutes.</p>");
+            std::list<Task*> tasks = system.getTaskManager().getTasks();
+            for(Task *it : system.getTaskManager().getTasks()){
+              if(it->getTaskId() == TaskOta){
+                ((OTATask *)it)->enableOTA(5*60*1000); //Enabling OTA for 5 minutes
+                system.getLogger().log(logging::LoggerLevel::LOGGER_LEVEL_INFO, getName(), "User enabled OTA for 5 minutes via web interface");
+                break;
+              }
+            }
+          }else{
+            client.println("<p>OTA password is invalid.</p>");
+          }
           client.println("<form><input type=\"button\" value=\"Go back\" onclick=\"history.back()\"></form>");
           client.println("</body></html>");
           client.println();
         }
+      }else if(header.indexOf("GET / ") == 0){
+        client.println("HTTP/1.1 301 Moved Permanently");
+        client.println("Location: /info");
+        client.println();
       }else if(header.indexOf("GET /info") == 0){
         // Display the HTML web page
         client.println("HTTP/1.1 200 OK");
@@ -93,7 +111,7 @@ bool WebTask::loop(System &system) {
           client.println(page);
           client.println();
         }
-      }else if(header.indexOf("GET") == 0){
+      }else{
         client.println("HTTP/1.0 404 Not Found");
         client.println("Content-type:text/html");
         client.println("Connection: close");
@@ -107,16 +125,11 @@ bool WebTask::loop(System &system) {
       break;
     }
 
-    if(curr_time-prev_time > TIMEOUT ){
-      Serial.println("Client timed out...");
-    }
 
     // Clear the header variable
     header = "";
     // Close the connection
     client.stop();
-    Serial.println("Client disconnected.");
-    Serial.println("");
   }
   
   return true;

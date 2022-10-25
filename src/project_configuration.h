@@ -144,11 +144,22 @@ public:
 
   class Web {
     public:
-    Web(): active(false), port(80){
+    Web(): active(false), port(80), otaPassword(""){
     }
 
-    bool  active;
-    int   port;
+    bool    active;
+    int     port;
+    String  otaPassword;
+  };
+
+  class OTA {
+    public:
+    OTA(): active(false), enableViaWeb(false), port(3232), password("") { }
+
+    bool    active;
+    bool    enableViaWeb;
+    int     port;
+    String  password;
   };
 
   Configuration() : callsign("NOCALL-10"), ntpServer("pool.ntp.org"), board("") {
@@ -166,6 +177,7 @@ public:
   MQTT    mqtt;
   Syslog  syslog;
   Web     web;
+  OTA     ota;
   String  ntpServer;
   String  board;
 };
