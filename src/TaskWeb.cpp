@@ -45,36 +45,36 @@ bool WebTask::loop(System &system) {
 
       if(header.indexOf("POST /enableOTA") == 0){
         if(header.indexOf("OTA_Password=") > 0){
+          //Get password from header
           int index = header.indexOf("OTA_Password=") + String("OTA_Password=").length();
           int end_line = header.indexOf("\n", index);
-
           String password = header.substring(index, end_line);
           password.trim();
-          client.println("HTTP/1.1 200 OK");
-          client.println("Content-type:text/html");
-          client.println("Connection: close");
-          client.println();
-          client.println("<!DOCTYPE html><html>");
-          client.println("<head><meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">");
-          client.println("<link rel=\"icon\" href=\"data:,\">");
-          client.println("<style>html { font-family: Helvetica; display: inline-block; margin: 0px auto; text-align: center;}</style></head>");
-          client.println("<body><h1>iGate Web Server</h1>");
+
+          client.println(STATUS_200);
+
+          //Load page and replace placeholder
+          String page = loadPage("/enableOTA.html");
+
           if(system.getUserConfig()->web.otaPassword.equals(password)){
-            client.println("<p>OTA password is correct.</p><p>OTA Enabled for 5 minutes.</p>");
             std::list<Task*> tasks = system.getTaskManager().getTasks();
             for(Task *it : system.getTaskManager().getTasks()){
               if(it->getTaskId() == TaskOta){
                 ((OTATask *)it)->enableOTA(5*60*1000); //Enabling OTA for 5 minutes
                 system.getLogger().log(logging::LoggerLevel::LOGGER_LEVEL_INFO, getName(), "User enabled OTA for 5 minutes via web interface");
+                page.replace("$$STATUS$$", "<p>OTA password is correct.</p><p>OTA Enabled for 5 minutes.</p>");
+
                 break;
               }
             }
+            page.replace("$$STATUS$$", "<p>OTA password is correct, however there was an error with the OTA task.</p>");
           }else{
-            client.println("<p>OTA password is invalid.</p>");
+            page.replace("$$STATUS$$", "<p>OTA password is invalid.</p>");
           }
-          client.println("<form><input type=\"button\" value=\"Go back\" onclick=\"history.back()\"></form>");
-          client.println("</body></html>");
-          client.println();
+
+          client.println(page);
+        }else{
+          client.stop();
         }
       }else if(header.indexOf("GET / ") == 0){
         client.println("HTTP/1.1 301 Moved Permanently");
@@ -82,35 +82,16 @@ bool WebTask::loop(System &system) {
         client.println();
       }else if(header.indexOf("GET /info") == 0){
         // Display the HTML web page
-        client.println("HTTP/1.1 200 OK");
-        client.println("Content-type:text/html");
-        client.println("Connection: close");
-        client.println();
-        SPIFFS.begin();
-        File info_html = SPIFFS.open("/info.html");
-        if(!info_html || !SPIFFS.exists("/info.html")){            
+        client.println(STATUS_200);
+        String page = loadPage("/info.html");
+        page.replace("$$CALLSIGN$$", system.getUserConfig()->callsign);
+        page.replace("$$IP$$", client.localIP().toString() + ":" +String(client.localPort()));
+        page.replace("$$AP$$", WiFi.SSID());
+        page.replace("$$RSSI$$", String(WiFi.RSSI()) + "dBm");
 
-          client.println("<!DOCTYPE html><html>");
-          client.println("<head><meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">");
-          client.println("<link rel=\"icon\" href=\"data:,\">");
-          client.println("<style>html { font-family: Helvetica; display: inline-block; margin: 0px auto; text-align: center;}</style></head>");
-          client.println("<body><h1>iGate Web Server</h1>");
-          client.println("<p>Error with filesystem.</p>");
-          client.println("</body></html>");
-          client.println();
-        }else{
-          String page = "";
-          while(info_html.available()){
-            page += info_html.readString();
-          }
-          page.replace("$$CALLSIGN$$", system.getUserConfig()->callsign);
-          page.replace("$$IP$$", client.localIP().toString() + ":" +String(client.localPort()));
-          page.replace("$$AP$$", WiFi.SSID());
-          page.replace("$$RSSI$$", String(WiFi.RSSI()) + "dBm");
-          page.trim();
-          client.println(page);
-          client.println();
-        }
+        page.trim();
+        client.println(page);
+        client.println();
       }else{
         client.println("HTTP/1.0 404 Not Found");
         client.println("Content-type:text/html");
@@ -133,4 +114,26 @@ bool WebTask::loop(System &system) {
   }
   
   return true;
+}
+
+String WebTask::loadPage(String file){
+  SPIFFS.begin();
+  String pageString;
+  File pageFile = SPIFFS.open(file);
+  if(!pageFile || !SPIFFS.exists(file)){ 
+    pageString = String("<!DOCTYPE html><html>"
+                        "<head><meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">"
+                        "<link rel=\"icon\" href=\"data:,\">"
+                        "<style>html { font-family: Helvetica; display: inline-block; margin: 0px auto; text-align: center;}</style></head>"
+                        "<body><h1>iGate Web Server</h1>"
+                        "<p>Error with filesystem.</p>"
+                        "</body></html>");
+  }else{
+    pageString.reserve(pageFile.size());
+    while(pageFile.available()){
+      pageString += pageFile.readString();
+    }
+  }
+
+  return pageString;
 }

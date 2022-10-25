@@ -15,6 +15,10 @@ public:
 private:
   WiFiServer http_server;
   const unsigned int TIMEOUT = 20000; // Timeout in ms
+  const String STATUS_200 = String("HTTP/1.1 200 OK\r\nContent-type:text/html\r\nConnection: close\r\n");
+
+  String loadPage(String file);
+
 };
 
 #endif

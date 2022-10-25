@@ -19,7 +19,7 @@ public:
     OTA_Disabled,       //OTA is temporarily disabled
   };
 
-  Status GetOTAStatus();
+  Status        getOTAStatus();
   void enableOTA(unsigned int timeout);
 
 
