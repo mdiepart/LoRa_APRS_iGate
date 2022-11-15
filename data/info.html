@@ -47,6 +47,15 @@
         <input type="password" id="OTA_Password" name="OTA_Password"><br>
         <input type="submit" value="Enable OTA">
     </form>
+
+    <h2>Firmware Update</h2>
+    <form action="/uploadFW" method="post" enctype="multipart/form-data">
+        <label for="Firmware_File">Firmware :</label><br>
+        <input type="file" id="Firmware_File" name="Firmware_File"><br>
+        <label for="SPIFFS_File">SPIFFS :</label><br>
+        <input type="file" id="SPIFFS_File" name="SPIFFS_File"><br>
+        <input type="submit" value="Upload">
+    </form>
 </body>
 
 </html>
