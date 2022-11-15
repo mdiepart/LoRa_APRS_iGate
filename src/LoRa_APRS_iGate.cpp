@@ -144,10 +144,7 @@ void setup() {
     }
 
     if(userConfig.web.active){
-      LoRaSystem.getLogger().log(logging::LoggerLevel::LOGGER_LEVEL_INFO, MODULE_NAME, "Web task added.");
       LoRaSystem.getTaskManager().addAlwaysRunTask(&webTask);
-    }else{
-      LoRaSystem.getLogger().log(logging::LoggerLevel::LOGGER_LEVEL_INFO, MODULE_NAME, "Web task inactive.");
     }
   }
 
