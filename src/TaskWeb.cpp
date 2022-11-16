@@ -3,15 +3,15 @@
 #include <esp_err.h>
 #include <esp_https_server.h>
 #include <esp_ota_ops.h>
-#include <logger.h>
 #include <esp_task_wdt.h>
+#include <logger.h>
 
 #include "Task.h"
 #include "TaskOTA.h"
 #include "TaskWeb.h"
 #include "project_configuration.h"
 
-WebTask::WebTask() : Task(TASK_WEB, TaskWeb), http_server(80){
+WebTask::WebTask() : Task(TASK_WEB, TaskWeb), http_server(80) {
 }
 
 WebTask::~WebTask() {
@@ -30,13 +30,13 @@ bool WebTask::loop(System &system) {
 
   WiFiClient client = http_server.available();
 
-  if(client){
+  if (client) {
     unsigned long curr_time = millis();
     unsigned long prev_time = curr_time;
     system.getLogger().log(logging::LoggerLevel::LOGGER_LEVEL_INFO, getName(), "new client with IP %s.", client.localIP().toString().c_str());
     String currentLine = "";
-    String header = "";
-    while (client.connected() && curr_time - prev_time <= TIMEOUT) {  // loop while the client's connected
+    String header      = "";
+    while (client.connected() && curr_time - prev_time <= TIMEOUT) { // loop while the client's connected
       curr_time = millis();
       client.setTimeout(TIMEOUT);
       // Get the first line of the header
@@ -268,26 +268,26 @@ void WebTask::uploadfw_html(String &header, WiFiClient &client, System &system) 
   }
 
   // Finished parsing header. Now parsing form data
-  const size_t BUFFER_LENGTH             = 511;
-  uint8_t         full_buffer[BUFFER_LENGTH + 3] = {0}; //add two bytes to allow prepending data when LF was read, add 1 for terminator
-  uint8_t        *read_buffer = full_buffer+2;
-  full_buffer[1] = '\n'; //This char will always be '\n'
-  int          len;
-  size_t       file_size = 0;
-  String       name;
-  String       filename;
-  esp_err_t    esp_error = ESP_OK;
+  const size_t BUFFER_LENGTH                  = 511;
+  uint8_t      full_buffer[BUFFER_LENGTH + 3] = {0}; // add two bytes to allow prepending data when LF was read, add 1 for terminator
+  uint8_t     *read_buffer                    = full_buffer + 2;
+  full_buffer[1]                              = '\n'; // This char will always be '\n'
+  int       len;
+  size_t    file_size = 0;
+  String    name;
+  String    filename;
+  esp_err_t esp_error = ESP_OK;
 
   // We loop over the files in the form
-  //while (client.available() && esp_error == ESP_OK) {
-  
-  len                   = client.readBytesUntil('\n', read_buffer, BUFFER_LENGTH);
-  read_buffer[len - 1]  = '\0'; // Replace '\r' by '\0'
+  // while (client.available() && esp_error == ESP_OK) {
 
-  if (strcmp(boundary_token.c_str(), (const char*)read_buffer) == 0) { // We found a boundary token. It should be at the beginning of a form part
-    while (client.available() && esp_error == ESP_OK){
+  len                  = client.readBytesUntil('\n', read_buffer, BUFFER_LENGTH);
+  read_buffer[len - 1] = '\0'; // Replace '\r' by '\0'
 
-      header = readRequestHeader(client);              // Read the header that is just after the boundary
+  if (strcmp(boundary_token.c_str(), (const char *)read_buffer) == 0) { // We found a boundary token. It should be at the beginning of a form part
+    while (client.available() && esp_error == ESP_OK) {
+
+      header = readRequestHeader(client); // Read the header that is just after the boundary
       // Determine field name
       name     = header.substring(header.indexOf("name=\"") + strlen("name=\""), header.indexOf("\"; filename"));
       filename = header.substring(header.indexOf("filename=\"") + strlen("filename=\""), header.indexOf("\"\r\n"));
@@ -303,7 +303,7 @@ void WebTask::uploadfw_html(String &header, WiFiClient &client, System &system) 
         const esp_partition_t *next_part = esp_ota_get_next_update_partition(NULL);
         esp_ota_handle_t       ota_handle;
         bool                   data_prepended = false;
-        esp_error                              = esp_ota_begin(next_part, OTA_SIZE_UNKNOWN, &ota_handle);
+        esp_error                             = esp_ota_begin(next_part, OTA_SIZE_UNKNOWN, &ota_handle);
 
         if (esp_error != ESP_OK) {
           system.getLogger().log(logging::LoggerLevel::LOGGER_LEVEL_WARN, getName(), "Error starting OTA.");
@@ -312,7 +312,7 @@ void WebTask::uploadfw_html(String &header, WiFiClient &client, System &system) 
 
         // While there is data available and we haven't read the boundary token
         while (esp_error == ESP_OK) {
-          //Updating is gonna take some time so we need to reset watchdog.
+          // Updating is gonna take some time so we need to reset watchdog.
           esp_task_wdt_reset();
           // Read from client if data is available
           if (client.available()) {
@@ -322,10 +322,10 @@ void WebTask::uploadfw_html(String &header, WiFiClient &client, System &system) 
             break;
           }
 
-          if(len == 0){
+          if (len == 0) {
             read_buffer[0] = '\n';
-            len = 1 + client.readBytesUntil('\n', read_buffer+1, BUFFER_LENGTH-1);
-            //system.getLogger().log(logging::LoggerLevel::LOGGER_LEVEL_INFO, getName(), "read with len < 1");
+            len            = 1 + client.readBytesUntil('\n', read_buffer + 1, BUFFER_LENGTH - 1);
+            // system.getLogger().log(logging::LoggerLevel::LOGGER_LEVEL_INFO, getName(), "read with len < 1");
           }
 
           // If we have read the boundary
@@ -334,33 +334,33 @@ void WebTask::uploadfw_html(String &header, WiFiClient &client, System &system) 
             break; // Escape from parsing loop
           } else {
             uint8_t *data;
-            bool prepend_again = false;
+            bool     prepend_again = false;
 
-            if ( len < BUFFER_LENGTH ) {
+            if (len < BUFFER_LENGTH) {
               // We found a terminator... We store the last byte in case they are the CRLF just before the boundary
               prepend_again = true;
               len--;
             }
 
-            if ( data_prepended ) {
+            if (data_prepended) {
               // We will be using full_buffer instead of read_buffer
               data = full_buffer;
               len += 2;
               data_prepended = false;
-            }else{
+            } else {
               data = read_buffer;
             }
 
-            if(len < 0){
+            if (len < 0) {
               system.getLogger().log(logging::LoggerLevel::LOGGER_LEVEL_INFO, getName(), "len < 0");
             }
             esp_ota_write(ota_handle, data, len);
 
-            //At this point, if data_prepended is true, that means that the last byte read must be placed in the "prepend" part of the buffer
-            if(prepend_again){
+            // At this point, if data_prepended is true, that means that the last byte read must be placed in the "prepend" part of the buffer
+            if (prepend_again) {
               full_buffer[0] = data[len];
               data_prepended = true;
-              prepend_again = false;
+              prepend_again  = false;
             }
             file_size += len;
           }
@@ -406,7 +406,7 @@ void WebTask::uploadfw_html(String &header, WiFiClient &client, System &system) 
         const esp_partition_t   *spiffs_part    = esp_partition_get(spiffs_part_it);
         esp_partition_iterator_release(spiffs_part_it);
 
-        bool    data_prepended = 0;
+        bool data_prepended = 0;
 
         esp_error = esp_partition_erase_range(spiffs_part, 0, spiffs_part->size);
         if (esp_error != ESP_OK) {
@@ -416,7 +416,7 @@ void WebTask::uploadfw_html(String &header, WiFiClient &client, System &system) 
 
         // While there is data available and we haven't read the boundary token
         while (esp_error == ESP_OK) {
-          //Updating is gonna take some time so we need to reset watchdog.
+          // Updating is gonna take some time so we need to reset watchdog.
           esp_task_wdt_reset();
 
           // Read from client if data is available
@@ -432,30 +432,30 @@ void WebTask::uploadfw_html(String &header, WiFiClient &client, System &system) 
             break; // Escape from parsing loop
           } else {
             uint8_t *data;
-            bool prepend_again = false;
+            bool     prepend_again = false;
 
-            if ( len < BUFFER_LENGTH ) {
+            if (len < BUFFER_LENGTH) {
               // We found a terminator... We store the last byte in case they are the CRLF just before the boundary
               prepend_again = true;
               len--;
             }
 
-            if ( data_prepended ) {
+            if (data_prepended) {
               // We will be using full_buffer instead of read_buffer
               len += 2;
               data_prepended = false;
-              data = full_buffer;
-            }else{
+              data           = full_buffer;
+            } else {
               data = read_buffer;
             }
 
             esp_error = esp_partition_write(spiffs_part, file_size, data, len);
 
-            //At this point, if data_prepended is true, that means that the last byte read must be placed in the "prepend" part of the buffer
-            if(prepend_again){
+            // At this point, if data_prepended is true, that means that the last byte read must be placed in the "prepend" part of the buffer
+            if (prepend_again) {
               full_buffer[0] = data[len];
               data_prepended = true;
-              prepend_again = false;
+              prepend_again  = false;
             }
             file_size += len;
           }
@@ -466,21 +466,21 @@ void WebTask::uploadfw_html(String &header, WiFiClient &client, System &system) 
           break;
         }
       }
-    }/* else if ((boundary_token + "--").equals(buffer)) {
-      // we found the end of form boundary
-      system.getLogger().log(logging::LoggerLevel::LOGGER_LEVEL_DEBUG, getName(), "Finished parsing full request.");
-      break;
-    }*/
+    } /* else if ((boundary_token + "--").equals(buffer)) {
+       // we found the end of form boundary
+       system.getLogger().log(logging::LoggerLevel::LOGGER_LEVEL_DEBUG, getName(), "Finished parsing full request.");
+       break;
+     }*/
   }
 
   client.println(STATUS_200);
   client.println("<!DOCTYPE html><html>"
-                        "<head><meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">"
-                        "<link rel=\"icon\" href=\"data:,\">"
-                        "<style>html { font-family: Helvetica; display: inline-block; margin: 0px auto; text-align: center;}</style></head>"
-                        "<body><h1>iGate Web Server</h1>"
-                        "<p>OTA Update successful. Please give the device 30s to reboot.</p>"
-                        "</body></html>");
+                 "<head><meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">"
+                 "<link rel=\"icon\" href=\"data:,\">"
+                 "<style>html { font-family: Helvetica; display: inline-block; margin: 0px auto; text-align: center;}</style></head>"
+                 "<body><h1>iGate Web Server</h1>"
+                 "<p>OTA Update successful. Please give the device 30s to reboot.</p>"
+                 "</body></html>");
   client.println();
 
   if (esp_error == ESP_OK) {

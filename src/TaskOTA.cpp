@@ -48,7 +48,7 @@ bool OTATask::setup(System &system) {
     _ota.setHostname(system.getUserConfig()->callsign.c_str());
   }
 
-  if(!system.getUserConfig()->ota.password.isEmpty()){
+  if (!system.getUserConfig()->ota.password.isEmpty()) {
     _ota.setPassword(system.getUserConfig()->ota.password.c_str());
     system.getLogger().log(logging::LoggerLevel::LOGGER_LEVEL_INFO, getName(), "Set OTA password to %s", system.getUserConfig()->ota.password.c_str());
   }
@@ -56,66 +56,66 @@ bool OTATask::setup(System &system) {
   _ota.setPort((uint16_t)system.getUserConfig()->ota.port);
   system.getLogger().log(logging::LoggerLevel::LOGGER_LEVEL_INFO, getName(), "Set OTA port to %u", system.getUserConfig()->ota.port);
 
-  if(system.getUserConfig()->ota.active){
-    if(system.getUserConfig()->ota.enableViaWeb){
+  if (system.getUserConfig()->ota.active) {
+    if (system.getUserConfig()->ota.enableViaWeb) {
       _stateInfo = "Web";
-      _status = OTA_Disabled;
-    }else{
+      _status    = OTA_Disabled;
+    } else {
       _stateInfo = "Okay";
-      _status = OTA_ForceEnabled;
+      _status    = OTA_ForceEnabled;
     }
-  }else{
-      _stateInfo = "Disabled";
-      _status = OTA_ForceDisabled;
+  } else {
+    _stateInfo = "Disabled";
+    _status    = OTA_ForceDisabled;
   }
 
   return true;
 }
 
 bool OTATask::loop(System &system) {
-  
-  if(_status == OTA_Enabled && (millis()-_enable_time >= _timeout)){
+
+  if (_status == OTA_Enabled && (millis() - _enable_time >= _timeout)) {
     _status = OTA_Disabled;
     system.getLogger().log(logging::LoggerLevel::LOGGER_LEVEL_INFO, getName(), "OTA Timed out. Disabling OTA.");
   }
 
-  if( !_beginCalled && (_status == OTA_ForceEnabled || _status == OTA_Enabled) ){
+  if (!_beginCalled && (_status == OTA_ForceEnabled || _status == OTA_Enabled)) {
     _ota.begin();
     _beginCalled = true;
   }
 
-  if( _beginCalled && (_status == OTA_ForceDisabled || _status == OTA_Disabled) ){
+  if (_beginCalled && (_status == OTA_ForceDisabled || _status == OTA_Disabled)) {
     _ota.end();
     _beginCalled = false;
   }
 
-  if( _beginCalled && (_status == OTA_ForceEnabled || _status == OTA_Enabled) ){
+  if (_beginCalled && (_status == OTA_ForceEnabled || _status == OTA_Enabled)) {
     _ota.handle();
   }
 
   return true;
 }
 
-OTATask::Status OTATask::getOTAStatus(){
+OTATask::Status OTATask::getOTAStatus() {
   return _status;
 }
 
-void OTATask::enableOTA(unsigned int timeout){
-  if(_status == OTA_Disabled || _status == OTA_Enabled){
+void OTATask::enableOTA(unsigned int timeout) {
+  if (_status == OTA_Disabled || _status == OTA_Enabled) {
     _enable_time = millis();
-    _timeout = timeout;
-    _status = OTA_Enabled;
+    _timeout     = timeout;
+    _status      = OTA_Enabled;
   }
 }
 
 /**
  * @brief Returns the time remaining before OTA times out and disables itself
- * 
+ *
  * @return unsigned int the time left in milliseconds
  */
-unsigned int OTATask::getTimeRemaining(){
-  if(_status == OTA_Enabled){
-    return (unsigned long)_timeout-millis()+_enable_time;
+unsigned int OTATask::getTimeRemaining() {
+  if (_status == OTA_Enabled) {
+    return (unsigned long)_timeout - millis() + _enable_time;
   }
   return 0;
 }

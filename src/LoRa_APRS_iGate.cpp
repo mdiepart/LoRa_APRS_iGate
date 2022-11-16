@@ -18,8 +18,8 @@
 #include "TaskOTA.h"
 #include "TaskRadiolib.h"
 #include "TaskRouter.h"
-#include "TaskWifi.h"
 #include "TaskWeb.h"
+#include "TaskWifi.h"
 #include "project_configuration.h"
 
 #define VERSION     "22.20.0"
@@ -60,16 +60,16 @@ void setup() {
   LoRaSystem.getLogger().log(logging::LoggerLevel::LOGGER_LEVEL_INFO, MODULE_NAME, "LoRa APRS iGate by OE5BPA (Peter Buchegger)");
   LoRaSystem.getLogger().log(logging::LoggerLevel::LOGGER_LEVEL_INFO, MODULE_NAME, "Version: %s", VERSION);
 
-  switch(esp_reset_reason()){
-    case ESP_RST_TASK_WDT:
-      LoRaSystem.getLogger().log(logging::LoggerLevel::LOGGER_LEVEL_DEBUG, MODULE_NAME, "Module reset because of watchdog timer.");
-      break;
-    case ESP_RST_SW:
-      LoRaSystem.getLogger().log(logging::LoggerLevel::LOGGER_LEVEL_DEBUG, MODULE_NAME, "Module reset following software call.");
-      break;
-    default:
-      LoRaSystem.getLogger().log(logging::LoggerLevel::LOGGER_LEVEL_DEBUG, MODULE_NAME, "Module reset for reason %d.", (int)esp_reset_reason());
-      break;  
+  switch (esp_reset_reason()) {
+  case ESP_RST_TASK_WDT:
+    LoRaSystem.getLogger().log(logging::LoggerLevel::LOGGER_LEVEL_DEBUG, MODULE_NAME, "Module reset because of watchdog timer.");
+    break;
+  case ESP_RST_SW:
+    LoRaSystem.getLogger().log(logging::LoggerLevel::LOGGER_LEVEL_DEBUG, MODULE_NAME, "Module reset following software call.");
+    break;
+  default:
+    LoRaSystem.getLogger().log(logging::LoggerLevel::LOGGER_LEVEL_DEBUG, MODULE_NAME, "Module reset for reason %d.", (int)esp_reset_reason());
+    break;
   }
 
   std::list<BoardConfig const *> boardConfigs;
@@ -155,7 +155,7 @@ void setup() {
       LoRaSystem.getTaskManager().addTask(&mqttTask);
     }
 
-    if(userConfig.web.active){
+    if (userConfig.web.active) {
       LoRaSystem.getTaskManager().addAlwaysRunTask(&webTask);
     }
   }
