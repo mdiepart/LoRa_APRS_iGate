@@ -38,7 +38,7 @@ bool WebTask::loop(System &system) {
       curr_time = millis();
       client.setTimeout(TIMEOUT);
       // Get the first line of the header
-      header += client.readStringUntil('\n');
+      header += client.readStringUntil('\n') + '\n';
       system.getLogger().log(logging::LoggerLevel::LOGGER_LEVEL_INFO, getName(), "%s", header.c_str());
 
       if (header.indexOf("POST /enableOTA") == 0) {
