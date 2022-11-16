@@ -118,3 +118,14 @@ The [LoRa APRS WiKi Displays](https://github.com/lora-aprs/LoRa_APRS_Tracker/wik
 
 Feel free to add hints!
 
+## TODO
+
+### WebServer
+* Move the OTA and partition writing code out of the webserver part
+* improve request parsing 
+* Add ad-hoc config fields to json file
+* When uploading both SPIFFS and firmware, an error happens leaving the device with no valid SPIFFS.
+  * Use two spiffs and alternate between them when successfully completed ?
+* Some form of webserver should be started even if no SPIFFS partition exists so that the device can be recovered in case of error 
+* Check for rollback 
+* Explore possible image signature

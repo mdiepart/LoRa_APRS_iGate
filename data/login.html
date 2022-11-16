@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="icon" href="data:,">
+    <style>
+        html {
+            font-family: Helvetica;
+            display: inline-block;
+            margin: 0px auto;
+            text-align: center;
+        }
+
+        .login_div {
+            display: inline-block;
+            border: 1pt solid black;
+            padding: 1cm;
+            padding-top: 0.5cm;
+            vertical-align: baseline;
+            margin-top: 2cm;
+        }
+
+        input {
+            margin-top: 5pt;
+        }
+
+    </style>
+</head>
+
+<body>
+    <div class="login_div">
+        <h1>Login</h1>
+        <form action="/login" method="post">
+            <label for="Password">Password:</label>
+            <input type="password" id="Password" name="Password"><br>
+            <input type="submit" value="Login">
+        </form>
+    </div>
+</body>
+
+</html>

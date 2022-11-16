@@ -26,6 +26,8 @@ bool WebTask::setup(System &system) {
 
 bool WebTask::loop(System &system) {
 
+  // TODO Refresh the list of connected clients
+
   WiFiClient client = http_server.available();
 
   if(client){
@@ -41,6 +43,8 @@ bool WebTask::loop(System &system) {
       header += client.readStringUntil('\n') + '\n';
       system.getLogger().log(logging::LoggerLevel::LOGGER_LEVEL_INFO, getName(), "%s", header.c_str());
 
+      // TODO If client was connected, refresh it's cookie lifetime ?
+
       if (header.indexOf("POST /enableOTA") == 0) {
         enableota_html(header, client, system);
       } else if (header.indexOf("GET / ") == 0) {
@@ -49,6 +53,8 @@ bool WebTask::loop(System &system) {
         info_html(header, client, system);
       } else if (header.indexOf("POST /uploadFW") == 0) {
         uploadfw_html(header, client, system);
+      } else if (header.indexOf("/login") > 0) {
+        page_login(header, client, system);
       } else {
         client.println("HTTP/1.0 404 Not Found");
         client.println("Content-type:text/html");
@@ -482,4 +488,88 @@ void WebTask::uploadfw_html(String &header, WiFiClient &client, System &system) 
     client.stop();
     esp_restart();
   }
+}
+
+void WebTask::page_login(String &header, WiFiClient &client, System &system) {
+
+  // Check for POST/GET
+
+  header += readRequestHeader(client);
+
+  if (header.indexOf("GET ") == 0) {
+    if (isClientLoggedIn(client, header)) {
+      client.println(STATUS_303_INFO);
+      return;
+    }
+
+    String page = loadPage("/login.html");
+    client.println(STATUS_200);
+    client.println(page);
+    client.println();
+  } else if (header.indexOf("POST") == 0) {
+    // Check password
+    // TODO
+
+    // Create a cookie
+    char cookie_value[65];
+    cookie_value[64] = '\0';
+    esp_fill_random(cookie_value, 64);
+
+    // Transform random values to valid alphanumeric chars
+    for (size_t i = 0; i < 64; i++) {
+      uint8_t b = cookie_value[i] % 62;
+      if (b < 10) {
+        cookie_value[i] = '0' + b;
+      } else if (b < 36) {
+        cookie_value[i] = 'A' + b - 10;
+      } else {
+        cookie_value[i] = 'a' + b - 36;
+      }
+    }
+
+    session_cookie cookie(millis(), cookie_value);
+    connected_clients.insert({client.remoteIP(), cookie});
+    client.println(STATUS_303_INFO + cookie.creationString());
+  }
+}
+
+// Check if client is already logged in. If so, redirect him to info. If not, present login page
+
+bool WebTask::isClientLoggedIn(const WiFiClient &client, const String &header) const {
+  std::map<uint32_t, struct session_cookie>::const_iterator it = connected_clients.find(client.remoteIP());
+  if ((it != connected_clients.end()) && getSessionCookie(header).equals(it->second.value) && (millis() - it->second.timestamp < SESSION_LIFETIME)) {
+    return true;
+  }
+  return false;
+}
+
+String WebTask::getSessionCookie(const String &header) const {
+  if (header.indexOf("Cookie: ") < 0) {
+    return String();
+  }
+  size_t i          = header.indexOf("Cookie: ");
+  String cookieLine = header.substring(i + strlen("Cookie: "), header.indexOf("\r\n", i));
+
+  i = cookieLine.indexOf("session=") + strlen("session=");
+  String session;
+  size_t j = 0;
+
+  // Read the line while we have alphanum chars.
+  while (true) {
+    if (isalnum(cookieLine.charAt(i + j))) {
+      session += cookieLine.charAt(i + j);
+    } else {
+      break;
+    }
+    j++;
+  }
+
+  return session;
+}
+
+String WebTask::session_cookie::creationString() {
+  return String("Set-Cookie: session=" + value + "; Max-Age=900; HttpOnly\r\n");
+}
+
+WebTask::session_cookie::session_cookie(unsigned long t, String val) : value(val), timestamp(t) {
 }
