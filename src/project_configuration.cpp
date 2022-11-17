@@ -108,8 +108,8 @@ void ProjectConfigurationManagement::readProjectConfiguration(DynamicJsonDocumen
       conf.web.active = data["webserver"]["active"] | false;
     if(data["webserver"].containsKey("port"))
       conf.web.port = data["webserver"]["port"] | 80;
-    if(data["webserver"].containsKey("OTAPassword"))
-      conf.web.otaPassword = data["webserver"]["OTAPassword"] | "";
+    if (data["webserver"].containsKey("password"))
+      conf.web.password = data["webserver"]["password"] | "";
   }
 
   if(data.containsKey("OTA")){
@@ -193,7 +193,7 @@ void ProjectConfigurationManagement::writeProjectConfiguration(Configuration &co
 
   data["webserver"]["active"]             = conf.web.active;
   data["webserver"]["port"]               = conf.web.port;
-  data["webserver"]["OTAPassword"]        = conf.web.otaPassword;
+  data["webserver"]["password"]        	  = conf.web.password;
 
   data["OTA"]["active"]                   = conf.ota.active;
   data["OTA"]["port"]                     = conf.ota.port;

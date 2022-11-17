@@ -83,7 +83,7 @@
 	"webserver": {
 		"active": false,
 		"port": 80,
-		"OTAPassword": "OTAWebPassword"
+		"password": "WebPassword"
 	},
 	"OTA": {
 		"active": false,

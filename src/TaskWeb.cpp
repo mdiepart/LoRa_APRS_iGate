@@ -26,7 +26,15 @@ bool WebTask::setup(System &system) {
 
 bool WebTask::loop(System &system) {
 
-  // TODO Refresh the list of connected clients
+  // Check for too old client sessions every 10s
+  static uint32_t timeSinceRefresh = 0;
+  if (millis() - timeSinceRefresh >= 10000) {
+    for (auto client : connected_clients) {
+      if (millis() - client.second.timestamp > SESSION_LIFETIME) {
+        connected_clients.erase(client.first);
+      }
+    }
+  }
 
   WiFiClient client = http_server.available();
 
@@ -40,39 +48,36 @@ bool WebTask::loop(System &system) {
       curr_time = millis();
       client.setTimeout(TIMEOUT);
       // Get the first line of the header
-      header += client.readStringUntil('\n') + '\n';
-      system.getLogger().log(logging::LoggerLevel::LOGGER_LEVEL_INFO, getName(), "%s", header.c_str());
+      header        = readRequestHeader(client);
+      String target = header.substring(0, header.indexOf("\r\n"));
 
-      // TODO If client was connected, refresh it's cookie lifetime ?
+      system.getLogger().log(logging::LoggerLevel::LOGGER_LEVEL_DEBUG, getName(), "%s", header.c_str());
 
-      if (header.indexOf("POST /enableOTA") == 0) {
-        enableota_html(header, client, system);
-      } else if (header.indexOf("GET / ") == 0) {
-        client.println("HTTP/1.1 301 Moved Permanently\r\nLocation: /info\r\n");
-      } else if (header.indexOf("GET /info") == 0) {
-        info_html(header, client, system);
-      } else if (header.indexOf("POST /uploadFW") == 0) {
-        uploadfw_html(header, client, system);
-      } else if (header.indexOf("/login") > 0) {
+      // TODO This way of checking the target is incorrect. As of now, /infoaaa will match /info
+      // TODO We might need to flush clients from time to time
+      if (target.indexOf("/login") > 0) {
         page_login(header, client, system);
+      } else if (!isClientLoggedIn(client, header)) {
+        client.println(STATUS_303_LOGIN);
       } else {
-        client.println("HTTP/1.0 404 Not Found");
-        client.println("Content-type:text/html");
-        client.println("Connection: close");
-        client.println();
-        client.println("<!DOCTYPE html><html>");
-        client.println("<head><meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">");
-        client.println("<link rel=\"icon\" href=\"data:,\">");
-        client.println("<body><h1>404 Not Found</h1></body></html>");
-        client.println();
+        if (target.indexOf("POST /enableOTA") == 0) {
+          enableota_html(header, client, system);
+        } else if (target.indexOf("GET / ") == 0) {
+          client.println("HTTP/1.1 301 Moved Permanently\r\nLocation: /info\r\n");
+        } else if (target.indexOf("GET /info") == 0) {
+          info_html(header, client, system);
+        } else if (target.indexOf("POST /uploadFW") == 0) {
+          uploadfw_html(header, client, system);
+        } else {
+          client.println(STATUS_404);
+        }
       }
-      break;
-    }
 
-    // Clear the header variable
-    header = "";
-    // Close the connection
-    client.stop();
+      // Clear the header variable
+      header = "";
+      // Close the connection
+      client.stop();
+    }
   }
 
   return true;
@@ -101,15 +106,8 @@ String WebTask::loadPage(String file) {
 }
 
 void WebTask::info_html(String &header, WiFiClient &client, System &system) {
-
-  Serial.println(header);
-
-  header += readRequest(client);
-
-  Serial.println(header);
-
   // Display the HTML web page
-  client.println(STATUS_200);
+  client.println(STATUS_200(client, header));
   String page = loadPage("/info.html");
   page.replace("$$CALLSIGN$$", system.getUserConfig()->callsign);
   page.replace("$$IP$$", client.localIP().toString() + ":" + String(client.localPort()));
@@ -168,41 +166,30 @@ void WebTask::info_html(String &header, WiFiClient &client, System &system) {
 }
 
 void WebTask::enableota_html(String &header, WiFiClient &client, System &system) {
-  header += readRequest(client);
-  if (header.indexOf("OTA_Password=") > 0) {
-    // Get password from header
-    int    index    = header.indexOf("OTA_Password=") + String("OTA_Password=").length();
-    int    end_line = header.indexOf("\n", index);
-    String password = header.substring(index, end_line);
-    password.trim();
+  String body = readRequestHeader(client);
 
-    client.println(STATUS_200);
+  client.println(STATUS_200(client, header));
 
-    // Load page and replace placeholder
-    String page = loadPage("/enableOTA.html");
+  // Load page and replace placeholder
+  String page = loadPage("/enableOTA.html");
 
-    if (system.getUserConfig()->web.otaPassword.equals(password)) {
-      std::list<Task *> tasks = system.getTaskManager().getTasks();
-      for (Task *it : system.getTaskManager().getTasks()) {
-        if (it->getTaskId() == TaskOta) {
-          ((OTATask *)it)->enableOTA(5 * 60 * 1000); // Enabling OTA for 5 minutes
-          system.getLogger().log(logging::LoggerLevel::LOGGER_LEVEL_INFO, getName(), "User enabled OTA for 5 minutes via web interface");
-          page.replace("$$STATUS$$", "<p>OTA password is correct.</p><p>OTA Enabled for 5 minutes.</p>");
+  std::list<Task *> tasks = system.getTaskManager().getTasks();
+  for (Task *it : system.getTaskManager().getTasks()) {
+    if (it->getTaskId() == TaskOta) {
+      ((OTATask *)it)->enableOTA(5 * 60 * 1000); // Enabling OTA for 5 minutes
+      system.getLogger().log(logging::LoggerLevel::LOGGER_LEVEL_INFO, getName(), "User enabled OTA for 5 minutes via web interface");
+      page.replace("$$STATUS$$", "<p>OTA Enabled for 5 minutes.</p>");
 
-          break;
-        }
-      }
-      page.replace("$$STATUS$$", "<p>OTA password is correct, however there was an error with the OTA task.</p>");
-    } else {
-      page.replace("$$STATUS$$", "<p>OTA password is invalid.</p>");
+      break;
     }
-
-    client.println(page);
-  } else {
-    client.stop();
   }
+
+  page.replace("$$STATUS$$", "<p>There was an error with the OTA task.</p>");
+
+  client.println(page);
 }
 
+// TODO ensure that we do not crash because of a header too large (could cause DOS)
 String WebTask::readRequestHeader(WiFiClient &client) {
   String        ret        = "";
   unsigned long start_time = millis();
@@ -224,7 +211,7 @@ String WebTask::readRequestHeader(WiFiClient &client) {
   return ret;
 }
 
-String WebTask::readRequest(WiFiClient &client) {
+/*String WebTask::readRequest(WiFiClient &client) {
   String        ret        = "";
   unsigned long start_time = millis();
   while (client.available() && (millis() - start_time < TIMEOUT * 1000)) {
@@ -232,13 +219,9 @@ String WebTask::readRequest(WiFiClient &client) {
   }
 
   return ret;
-}
+}*/
 
 void WebTask::uploadfw_html(String &header, WiFiClient &client, System &system) {
-
-  header += readRequestHeader(client);
-  system.getLogger().log(logging::LoggerLevel::LOGGER_LEVEL_DEBUG, getName(), "%s", header.c_str());
-
   const String str_content_type     = "Content-Type: multipart/form-data;";
   const String str_content_length   = "Content-Length: ";
   const String str_boundary         = "boundary=";
@@ -277,9 +260,6 @@ void WebTask::uploadfw_html(String &header, WiFiClient &client, System &system) 
   String    name;
   String    filename;
   esp_err_t esp_error = ESP_OK;
-
-  // We loop over the files in the form
-  // while (client.available() && esp_error == ESP_OK) {
 
   len                  = client.readBytesUntil('\n', read_buffer, BUFFER_LENGTH);
   read_buffer[len - 1] = '\0'; // Replace '\r' by '\0'
@@ -473,7 +453,7 @@ void WebTask::uploadfw_html(String &header, WiFiClient &client, System &system) 
      }*/
   }
 
-  client.println(STATUS_200);
+  client.println(STATUS_200(client, header));
   client.println("<!DOCTYPE html><html>"
                  "<head><meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">"
                  "<link rel=\"icon\" href=\"data:,\">"
@@ -491,11 +471,7 @@ void WebTask::uploadfw_html(String &header, WiFiClient &client, System &system) 
 }
 
 void WebTask::page_login(String &header, WiFiClient &client, System &system) {
-
   // Check for POST/GET
-
-  header += readRequestHeader(client);
-
   if (header.indexOf("GET ") == 0) {
     if (isClientLoggedIn(client, header)) {
       client.println(STATUS_303_INFO);
@@ -503,33 +479,47 @@ void WebTask::page_login(String &header, WiFiClient &client, System &system) {
     }
 
     String page = loadPage("/login.html");
-    client.println(STATUS_200);
+    page.replace("$$STATUS$$", "");
+    client.println(STATUS_200(client, header));
     client.println(page);
     client.println();
   } else if (header.indexOf("POST") == 0) {
     // Check password
-    // TODO
 
-    // Create a cookie
-    char cookie_value[65];
-    cookie_value[64] = '\0';
-    esp_fill_random(cookie_value, 64);
+    String body     = readRequestHeader(client);
+    size_t i        = body.indexOf("Password=");
+    String password = body.substring(i + strlen("Password="), body.indexOf("\r\n", i));
 
-    // Transform random values to valid alphanumeric chars
-    for (size_t i = 0; i < 64; i++) {
-      uint8_t b = cookie_value[i] % 62;
-      if (b < 10) {
-        cookie_value[i] = '0' + b;
-      } else if (b < 36) {
-        cookie_value[i] = 'A' + b - 10;
-      } else {
-        cookie_value[i] = 'a' + b - 36;
+    if (system.getUserConfig()->web.password.equals(password)) {
+      // Create a cookie
+      char cookie_value[65];
+      cookie_value[64] = '\0';
+      esp_fill_random(cookie_value, 64);
+
+      // Transform random values to valid alphanumeric chars
+      for (size_t i = 0; i < 64; i++) {
+        uint8_t b = cookie_value[i] % 62;
+        if (b < 10) {
+          cookie_value[i] = '0' + b;
+        } else if (b < 36) {
+          cookie_value[i] = 'A' + b - 10;
+        } else {
+          cookie_value[i] = 'a' + b - 36;
+        }
       }
-    }
 
-    session_cookie cookie(millis(), cookie_value);
-    connected_clients.insert({client.remoteIP(), cookie});
-    client.println(STATUS_303_INFO + cookie.creationString());
+      // Send redirection request with cookie
+      session_cookie cookie(millis(), cookie_value);
+      connected_clients.insert({client.remoteIP(), cookie});
+      client.println(STATUS_303_INFO + cookie.creationString());
+    } else {
+      // Invalid password
+      String page = loadPage("/login.html");
+      page.replace("$$STATUS$$", "<p class=\"warning\">Invalid password</p>");
+      client.println(STATUS_200(client, header));
+      client.println(page);
+      client.println();
+    }
   }
 }
 
@@ -572,4 +562,15 @@ String WebTask::session_cookie::creationString() {
 }
 
 WebTask::session_cookie::session_cookie(unsigned long t, String val) : value(val), timestamp(t) {
+}
+
+String WebTask::STATUS_200(WiFiClient &client, const String &header) {
+  String response = "HTTP/1.1 200 OK\r\nContent-type:text/html\r\nConnection: close\r\n";
+  if (isClientLoggedIn(client, header)) {
+    session_cookie cookie                                       = session_cookie(millis(), connected_clients.find(client.remoteIP())->second.value);
+    connected_clients.find(client.remoteIP())->second.timestamp = millis();
+    return response + cookie.creationString();
+  } else {
+    return response;
+  }
 }

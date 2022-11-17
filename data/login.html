@@ -25,12 +25,19 @@
             margin-top: 5pt;
         }
 
+        .warning {
+            color: red;
+            font-style: italic;
+            font-size: 0.9em;
+        }
+
     </style>
 </head>
 
 <body>
     <div class="login_div">
         <h1>Login</h1>
+        $$STATUS$$
         <form action="/login" method="post">
             <label for="Password">Password:</label>
             <input type="password" id="Password" name="Password"><br>

@@ -144,12 +144,12 @@ public:
 
   class Web {
     public:
-    Web(): active(false), port(80), otaPassword(""){
+    Web() : active(false), port(80), password("") {
     }
 
     bool    active;
     int     port;
-    String  otaPassword;
+    String password;
   };
 
   class OTA {
