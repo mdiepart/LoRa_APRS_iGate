@@ -143,23 +143,24 @@ public:
   };
 
   class Web {
-    public:
+  public:
     Web() : active(false), port(80), password("") {
     }
 
-    bool    active;
-    int     port;
+    bool   active;
+    int    port;
     String password;
   };
 
   class OTA {
-    public:
-    OTA(): active(false), enableViaWeb(false), port(3232), password("") { }
+  public:
+    OTA() : active(false), enableViaWeb(false), port(3232), password("") {
+    }
 
-    bool    active;
-    bool    enableViaWeb;
-    int     port;
-    String  password;
+    bool   active;
+    bool   enableViaWeb;
+    int    port;
+    String password;
   };
 
   Configuration() : callsign("NOCALL-10"), ntpServer("pool.ntp.org"), board("") {
