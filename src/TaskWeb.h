@@ -27,7 +27,7 @@ private:
   const unsigned int SESSION_LIFETIME = 900000; // user session lifetime in ms (900 000 is 15 minutes)
   const String       STATUS_303_INFO  = String("HTTP/1.1 303 See Other\r\nLocation: /info\r\nContent-type:text/html\r\nConnection: close\r\n");
   const String       STATUS_303_LOGIN = String("HTTP/1.1 303 See Other\r\nLocation: /login\r\nContent-type:text/html\r\nConnection: close\r\n");
-  const String       STATUS_404       = String("HTTP/1.0 404 Not Found\r\nContent-type:text/html\r\nConnection: close\r\n\r\n<!DOCTYPE html><html>"
+  const String       STATUS_404       = String("HTTP/1.1 404 Not Found\r\nContent-type:text/html\r\nConnection: close\r\n\r\n<!DOCTYPE html><html>"
                                                            "<head><meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">"
                                                            "<link rel=\"icon\" href=\"data:,\"><body><h1>404 Not Found</h1></body></html>\r\n");
 
@@ -43,6 +43,26 @@ private:
   void enableota_html(String &header, WiFiClient &client, System &system);
   void uploadfw_html(String &header, WiFiClient &client, System &system);
   void page_login(String &header, WiFiClient &client, System &system);
+};
+
+class webTarget {
+public:
+  webTarget(String line);
+
+  enum Method {
+    NOT_SUPPORTED = 0,
+    GET,
+    POST,
+  };
+
+  enum Method getMethod();
+  String      getResource();
+  String      getVersion();
+
+private:
+  enum Method method;
+  String      resource;
+  String      version;
 };
 
 #endif

@@ -48,26 +48,40 @@ bool WebTask::loop(System &system) {
       curr_time = millis();
       client.setTimeout(TIMEOUT);
       // Get the first line of the header
-      header        = readRequestHeader(client);
-      String target = header.substring(0, header.indexOf("\r\n"));
+      header = readRequestHeader(client);
 
       system.getLogger().log(logging::LoggerLevel::LOGGER_LEVEL_DEBUG, getName(), "%s", header.c_str());
 
-      // TODO This way of checking the target is incorrect. As of now, /infoaaa will match /info
-      // TODO We might need to flush clients from time to time
-      if (target.indexOf("/login") > 0) {
+      webTarget target(header.substring(0, header.indexOf("\r\n")));
+
+      if (target.getMethod() == webTarget::NOT_SUPPORTED) {
+        // 501 Not Implemented
+        client.println("HTTP/1.1 501 Not Implemented\r\nContent-type:text/html\r\nConnection: close\r\n");
+      } else if (target.getResource().equals("/login")) {
         page_login(header, client, system);
       } else if (!isClientLoggedIn(client, header)) {
         client.println(STATUS_303_LOGIN);
       } else {
-        if (target.indexOf("POST /enableOTA") == 0) {
-          enableota_html(header, client, system);
-        } else if (target.indexOf("GET / ") == 0) {
+        if (target.getResource().equals("/enableOTA")) {
+          if (target.getMethod() == webTarget::POST) {
+            enableota_html(header, client, system);
+          } else {
+            client.println("HTTP/1.1 405 Method Not Allowed\r\nAllow: GET\r\nContent-type:text/html\r\nConnection: close\r\n");
+          }
+        } else if (target.getResource().equals("/")) {
           client.println("HTTP/1.1 301 Moved Permanently\r\nLocation: /info\r\n");
-        } else if (target.indexOf("GET /info") == 0) {
-          info_html(header, client, system);
-        } else if (target.indexOf("POST /uploadFW") == 0) {
-          uploadfw_html(header, client, system);
+        } else if (target.getResource().equals("/info")) {
+          if (target.getMethod() == webTarget::GET) {
+            info_html(header, client, system);
+          } else {
+            client.println("HTTP/1.1 405 Method Not Allowed\r\nAllow: GET\r\nContent-type:text/html\r\nConnection: close\r\n");
+          }
+        } else if (target.getResource().equals("/uploadFW")) {
+          if (target.getMethod() == webTarget::POST) {
+            uploadfw_html(header, client, system);
+          } else {
+            client.println("HTTP/1.1 405 Method Not Allowed\r\nAllow: POST\r\nContent-type:text/html\r\nConnection: close\r\n");
+          }
         } else {
           client.println(STATUS_404);
         }
@@ -76,6 +90,7 @@ bool WebTask::loop(System &system) {
       // Clear the header variable
       header = "";
       // Close the connection
+      client.flush();
       client.stop();
     }
   }
@@ -573,4 +588,30 @@ String WebTask::STATUS_200(WiFiClient &client, const String &header) {
   } else {
     return response;
   }
+}
+
+webTarget::webTarget(String line) {
+  if (line.startsWith("GET ")) {
+    method   = GET;
+    resource = line.substring(4, line.indexOf(" HTTP/"));
+    version  = line.substring(line.indexOf(" HTTP/") + 6, line.indexOf("\r\n"));
+  } else if (line.startsWith("POST ")) {
+    method   = POST;
+    resource = line.substring(5, line.indexOf(" HTTP/"));
+    version  = line.substring(line.indexOf(" HTTP/") + 6, line.indexOf("\r\n"));
+  } else {
+    method = NOT_SUPPORTED;
+  }
+}
+
+webTarget::Method webTarget::getMethod() {
+  return method;
+}
+
+String webTarget::getResource() {
+  return resource;
+}
+
+String webTarget::getVersion() {
+  return version;
 }
