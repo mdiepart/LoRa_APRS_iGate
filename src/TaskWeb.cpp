@@ -573,7 +573,7 @@ String WebTask::getSessionCookie(const String &header) const {
 }
 
 String WebTask::session_cookie::creationString() {
-  return String("Set-Cookie: session=" + value + "; Max-Age=900; HttpOnly\r\n");
+  return String("Set-Cookie: session=" + value + "; Max-Age=900; HttpOnly; SameSite=Strict\r\n");
 }
 
 WebTask::session_cookie::session_cookie(unsigned long t, String val) : value(val), timestamp(t) {
