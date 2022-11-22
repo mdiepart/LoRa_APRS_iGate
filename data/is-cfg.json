@@ -1,5 +1,5 @@
 {
-	"callsign": "NOCALL-10",
+	"callsign": "ON4MOD-10",
 	"network": {
 		"DHCP": true,
 		"static": {
@@ -11,30 +11,33 @@
 		},
 		"hostname": {
 			"overwrite": false,
-			"name": "NOCALL-10"
+			"name": "ON4MOD-10"
 		}
 	},
 	"wifi": {
 		"active": true,
 		"AP": [
 			{
-				"SSID": "YOURSSID",
-				"password": "YOURPASSWORD"
+				"SSID": "PleaseRickRollYourself",
+				"password": "NeverGonnaGiveYouUpEnVerlan"
+			},
+			{
+				"SSID": "Guest"
 			}
 		]
 	},
 	"beacon": {
 		"message": "LoRa iGATE & Digi, Info: github.com/lora-aprs/LoRa_APRS_iGate",
 		"position": {
-			"latitude": 0.000000,
-			"longitude": 0.000000
+			"latitude": 50.602404303532644,
+			"longitude": 5.520866495495225
 		},
 		"use_gps": false,
 		"timeout": 15
 	},
 	"aprs_is": {
 		"active": true,
-		"passcode": "",
+		"passcode": "18341",
 		"server": "euro.aprs2.net",
 		"port": 14580
 	},
@@ -81,15 +84,15 @@
 		"port": 514
 	},
 	"webserver": {
-		"active": false,
+		"active": true,
 		"port": 80,
 		"password": "WebPassword"
 	},
 	"OTA": {
-		"active": false,
-		"enableViaWeb": false,
+		"active": true,
+		"enableViaWeb": true,
 		"port": 3232,
-		"password": ""
+		"password": "5Ykq9KEao6wFQvufx"
 	},
 	"ntp_server": "pool.ntp.org"
 }
