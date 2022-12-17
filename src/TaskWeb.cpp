@@ -1,9 +1,9 @@
 #include <SPIFFS.h>
 #include <WiFi.h>
 #include <esp_err.h>
-#include <esp_https_server.h>
 #include <esp_ota_ops.h>
 #include <esp_task_wdt.h>
+#include <functional>
 #include <logger.h>
 
 #include "Task.h"
@@ -20,6 +20,31 @@ WebTask::~WebTask() {
 bool WebTask::setup(System &system) {
   http_server.begin();
   _stateInfo = "Online";
+  // system     = &sys;
+
+  Webserver = webserver();
+  {
+    using namespace std::placeholders;
+    auto fn_root_redirect = std::bind(std::mem_fn(&WebTask::root_redirect), this, _1, _2, _3);
+    Webserver.addTarget(webserver::GET, "/", fn_root_redirect); // root. Return 301 -> /info ; no auth
+
+    auto fn_style_css = std::bind(std::mem_fn(&WebTask::style_css), this, _1, _2, _3);
+    Webserver.addTarget(webserver::GET, "/style.css", fn_style_css); // style.css; no auth
+
+    auto fn_login = std::bind(std::mem_fn(&WebTask::login_page), this, _1, _2, _3);
+    Webserver.addTarget(webserver::GET, "/login", fn_login);  // /login ; no auth
+    Webserver.addTarget(webserver::POST, "/login", fn_login); // /login ; no auth
+
+    auto fn_enable_ota = std::bind(std::mem_fn(&WebTask::enableota_page), this, _1, _2, _3);
+    Webserver.addTarget(webserver::POST, "/enableOTA", fn_enable_ota); // /enableOTA ; auth
+
+    auto fn_info = std::bind(std::mem_fn(&WebTask::info_page), this, _1, _2, _3);
+    Webserver.addTarget(webserver::GET, "/info", fn_info); // /info ; auth
+
+    auto fn_uploadFW = std::bind(std::mem_fn(&WebTask::uploadfw_page), this, _1, _2, _3);
+    Webserver.addTarget(webserver::POST, "/uploadFW", fn_uploadFW); // /uploadFW; auth
+  }
+
   system.getLogger().log(logging::LoggerLevel::LOGGER_LEVEL_INFO, getName(), "Web server started.");
   return true;
 }
@@ -36,70 +61,18 @@ bool WebTask::loop(System &system) {
     }
   }
 
+  // Check if we have a client available and serve it
   WiFiClient client = http_server.available();
 
   if (client) {
-    unsigned long curr_time = millis();
-    unsigned long prev_time = curr_time;
+    client.setTimeout(TIMEOUT);
     system.getLogger().log(logging::LoggerLevel::LOGGER_LEVEL_INFO, getName(), "new client with IP %s.", client.localIP().toString().c_str());
-    String currentLine = "";
-    String header      = "";
-    while (client.connected() && curr_time - prev_time <= TIMEOUT) { // loop while the client's connected
-      curr_time = millis();
-      client.setTimeout(TIMEOUT);
-      // Get the first line of the header
-      header = readRequestHeader(client);
 
-      system.getLogger().log(logging::LoggerLevel::LOGGER_LEVEL_DEBUG, getName(), "%s", header.c_str());
+    Webserver.serve(client, system);
 
-      webTarget target(header.substring(0, header.indexOf("\r\n")));
-
-      if (target.getMethod() == webTarget::NOT_SUPPORTED) {
-        // 501 Not Implemented
-        client.println("HTTP/1.1 501 Not Implemented\r\nContent-type:text/html\r\nConnection: close\r\n");
-      } else if (target.getResource().equals("/style.css")) {
-        if (target.getMethod() == webTarget::GET) {
-          client.println("HTTP/1.1 200 OK\r\nContent-type:text/css\r\nConnection: close\r\n");
-          client.println(loadPage("/style.css"));
-        } else {
-          client.println("HTTP/1.1 405 Method Not Allowed\r\nAllow: GET\r\nContent-type:text/html\r\nConnection: close\r\n");
-        }
-      } else if (target.getResource().equals("/login")) {
-        page_login(header, client, system);
-      } else if (!isClientLoggedIn(client, header)) {
-        client.println(STATUS_303_LOGIN);
-      } else {
-        if (target.getResource().equals("/enableOTA")) {
-          if (target.getMethod() == webTarget::POST) {
-            enableota_html(header, client, system);
-          } else {
-            client.println("HTTP/1.1 405 Method Not Allowed\r\nAllow: GET\r\nContent-type:text/html\r\nConnection: close\r\n");
-          }
-        } else if (target.getResource().equals("/")) {
-          client.println("HTTP/1.1 301 Moved Permanently\r\nLocation: /info\r\n");
-        } else if (target.getResource().equals("/info")) {
-          if (target.getMethod() == webTarget::GET) {
-            info_html(header, client, system);
-          } else {
-            client.println("HTTP/1.1 405 Method Not Allowed\r\nAllow: GET\r\nContent-type:text/html\r\nConnection: close\r\n");
-          }
-        } else if (target.getResource().equals("/uploadFW")) {
-          if (target.getMethod() == webTarget::POST) {
-            uploadfw_html(header, client, system);
-          } else {
-            client.println("HTTP/1.1 405 Method Not Allowed\r\nAllow: POST\r\nContent-type:text/html\r\nConnection: close\r\n");
-          }
-        } else {
-          client.println(STATUS_404);
-        }
-      }
-
-      // Clear the header variable
-      header = "";
-      // Close the connection
-      client.flush();
-      client.stop();
-    }
+    // Close the connection
+    // client.flush();
+    client.stop();
   }
 
   return true;
@@ -110,6 +83,7 @@ String WebTask::loadPage(String file) {
   String pageString;
   File   pageFile = SPIFFS.open(file);
   if (!pageFile || !SPIFFS.exists(file)) {
+    Serial.println("Could not read required file from spiffs...");
     pageString = String("<!DOCTYPE html><html>"
                         "<head><meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">"
                         "<link rel=\"icon\" href=\"data:,\">"
@@ -118,6 +92,8 @@ String WebTask::loadPage(String file) {
                         "<p>Error with filesystem.</p>"
                         "</body></html>");
   } else {
+    Serial.println("Accessed file from spiffs...");
+
     pageString.reserve(pageFile.size());
     while (pageFile.available()) {
       pageString += pageFile.readString();
@@ -127,8 +103,34 @@ String WebTask::loadPage(String file) {
   return pageString;
 }
 
-void WebTask::info_html(String &header, WiFiClient &client, System &system) {
-  // Display the HTML web page
+// TODO ensure that we do not crash because of a header too large (could cause DOS)
+String WebTask::readCRLFCRLF(WiFiClient &client) {
+  String        ret        = "";
+  unsigned long start_time = millis();
+  while (client.available() && (millis() - start_time < TIMEOUT * 1000)) {
+    char c = (char)client.read(); // Should succeed because client.available returned true
+    ret += c;
+    if (c == '\r') {
+      // We might be at the end of the header. Check for that.
+      char lfcrlf[4] = {0};
+
+      client.readBytes(lfcrlf, 3);
+      ret += lfcrlf;
+      if (strcmp(lfcrlf, "\n\r\n") == 0) {
+        return ret;
+      }
+    }
+  }
+
+  return ret;
+}
+
+void WebTask::info_page(WiFiClient &client, webserver::Header_t &header, System &system) {
+  if (!isClientLoggedIn(client, header)) {
+    client.println(STATUS_303_LOGIN);
+    return;
+  }
+
   client.println(STATUS_200(client, header));
   String page = loadPage("/info.html");
   page.replace("$$CALLSIGN$$", system.getUserConfig()->callsign);
@@ -187,9 +189,11 @@ void WebTask::info_html(String &header, WiFiClient &client, System &system) {
   client.println();
 }
 
-void WebTask::enableota_html(String &header, WiFiClient &client, System &system) {
-  String body = readRequestHeader(client);
-
+void WebTask::enableota_page(WiFiClient &client, webserver::Header_t &header, System &system) {
+  if (!isClientLoggedIn(client, header)) {
+    client.println(STATUS_303_LOGIN);
+    return;
+  }
   client.println(STATUS_200(client, header));
 
   // Load page and replace placeholder
@@ -211,65 +215,27 @@ void WebTask::enableota_html(String &header, WiFiClient &client, System &system)
   client.println(page);
 }
 
-// TODO ensure that we do not crash because of a header too large (could cause DOS)
-String WebTask::readRequestHeader(WiFiClient &client) {
-  String        ret        = "";
-  unsigned long start_time = millis();
-  while (client.available() && (millis() - start_time < TIMEOUT * 1000)) {
-    char c = (char)client.read(); // Should succeed because client.available returned true
-    ret += c;
-    if (c == '\r') {
-      // We might be at the end of the header. Check for that.
-      char lfcrlf[4] = {0};
-
-      client.readBytes(lfcrlf, 3);
-      ret += lfcrlf;
-      if (strcmp(lfcrlf, "\n\r\n") == 0) {
-        return ret;
-      }
-    }
+void WebTask::uploadfw_page(WiFiClient &client, webserver::Header_t &header, System &system) {
+  if (!isClientLoggedIn(client, header)) {
+    client.println(STATUS_303_LOGIN);
+    return;
   }
-
-  return ret;
-}
-
-/*String WebTask::readRequest(WiFiClient &client) {
-  String        ret        = "";
-  unsigned long start_time = millis();
-  while (client.available() && (millis() - start_time < TIMEOUT * 1000)) {
-    ret += (char)client.read(); // Should succeed because client.available returned true
-  }
-
-  return ret;
-}*/
-
-void WebTask::uploadfw_html(String &header, WiFiClient &client, System &system) {
-  const String str_content_type     = "Content-Type: multipart/form-data;";
-  const String str_content_length   = "Content-Length: ";
-  const String str_boundary         = "boundary=";
-  int          content_type_index   = header.indexOf(str_content_type);
-  int          content_length_index = header.indexOf(str_content_length);
-  size_t       content_length       = 0;
+  const String str_content_type   = "Content-Type: multipart/form-data;";
+  const String str_content_length = "Content-Length: ";
+  const String str_boundary       = "boundary=";
   String       boundary_token;
 
-  if (content_type_index < 0) {
+  webserver::Header_t::const_iterator it_content_type = header.find("Content-Type");
+  if (it_content_type == header.cend()) {
     // This header does not describe data the way we expect it
     system.getLogger().log(logging::LoggerLevel::LOGGER_LEVEL_DEBUG, getName(), "No content type in header.");
-    client.flush();
+    client.println(STATUS_400);
     return;
   } else {
     // Fetch boundary token
-    boundary_token = "--" + header.substring(header.indexOf(str_boundary, content_type_index) + str_boundary.length(), header.indexOf("\r\n", content_type_index));
+    String content_type = it_content_type->second;
+    boundary_token      = "--" + content_type.substring(content_type.indexOf(str_boundary) + str_boundary.length());
     system.getLogger().log(logging::LoggerLevel::LOGGER_LEVEL_DEBUG, getName(), "The boundary to compare with is %s.", boundary_token.c_str());
-  }
-
-  if (content_length_index < 0) {
-    // There is no content length in the header
-    system.getLogger().log(logging::LoggerLevel::LOGGER_LEVEL_DEBUG, getName(), "No content length in header.");
-    client.flush();
-    return;
-  } else {
-    content_length = header.substring(content_length_index + str_content_length.length(), header.indexOf("\r\n", content_length_index)).toInt();
   }
 
   // Finished parsing header. Now parsing form data
@@ -283,13 +249,13 @@ void WebTask::uploadfw_html(String &header, WiFiClient &client, System &system) 
   String    filename;
   esp_err_t esp_error = ESP_OK;
 
+  // Read a line. It should be the first boundary of the form-data
   len                  = client.readBytesUntil('\n', read_buffer, BUFFER_LENGTH);
   read_buffer[len - 1] = '\0'; // Replace '\r' by '\0'
-
+  system.getLogger().log(logging::LoggerLevel::LOGGER_LEVEL_DEBUG, "uploadFW", "boundary token = %s, buffer = %s.", boundary_token.c_str(), read_buffer);
   if (strcmp(boundary_token.c_str(), (const char *)read_buffer) == 0) { // We found a boundary token. It should be at the beginning of a form part
     while (client.available() && esp_error == ESP_OK) {
-
-      header = readRequestHeader(client); // Read the header that is just after the boundary
+      String header = readCRLFCRLF(client); // Read the header that is just after the boundary
       // Determine field name
       name     = header.substring(header.indexOf("name=\"") + strlen("name=\""), header.indexOf("\"; filename"));
       filename = header.substring(header.indexOf("filename=\"") + strlen("filename=\""), header.indexOf("\"\r\n"));
@@ -327,7 +293,7 @@ void WebTask::uploadfw_html(String &header, WiFiClient &client, System &system) 
           if (len == 0) {
             read_buffer[0] = '\n';
             len            = 1 + client.readBytesUntil('\n', read_buffer + 1, BUFFER_LENGTH - 1);
-            // system.getLogger().log(logging::LoggerLevel::LOGGER_LEVEL_INFO, getName(), "read with len < 1");
+            // system->getLogger().log(logging::LoggerLevel::LOGGER_LEVEL_INFO, getName(), "read with len < 1");
           }
 
           // If we have read the boundary
@@ -470,9 +436,15 @@ void WebTask::uploadfw_html(String &header, WiFiClient &client, System &system) 
       }
     } /* else if ((boundary_token + "--").equals(buffer)) {
        // we found the end of form boundary
-       system.getLogger().log(logging::LoggerLevel::LOGGER_LEVEL_DEBUG, getName(), "Finished parsing full request.");
+       system->getLogger().log(logging::LoggerLevel::LOGGER_LEVEL_DEBUG, getName(), "Finished parsing full request.");
        break;
      }*/
+  } else {
+    // No token where one is expected
+    system.getLogger().log(logging::LoggerLevel::LOGGER_LEVEL_WARN, getName(), "Could not find firmware data.");
+
+    client.println(STATUS_400);
+    return;
   }
 
   client.println(STATUS_200(client, header));
@@ -482,8 +454,7 @@ void WebTask::uploadfw_html(String &header, WiFiClient &client, System &system) 
                  "<style>html { font-family: Helvetica; display: inline-block; margin: 0px auto; text-align: center;}</style></head>"
                  "<body><h1>iGate Web Server</h1>"
                  "<p>OTA Update successful. Please give the device 30s to reboot.</p>"
-                 "</body></html>");
-  client.println();
+                 "</body></html>\r\n");
 
   if (esp_error == ESP_OK) {
     system.getLogger().log(logging::LoggerLevel::LOGGER_LEVEL_WARN, getName(), "ESP OTA succeeded. Restarting in 2s.");
@@ -492,9 +463,17 @@ void WebTask::uploadfw_html(String &header, WiFiClient &client, System &system) 
   }
 }
 
-void WebTask::page_login(String &header, WiFiClient &client, System &system) {
+void WebTask::login_page(WiFiClient &client, webserver::Header_t &header, System &system) {
   // Check for POST/GET
-  if (header.indexOf("GET ") == 0) {
+
+  webserver::Header_t::const_iterator it_startLine = header.find("");
+  if (it_startLine == header.cend()) {
+    client.println(STATUS_500);
+    return;
+  }
+  String startLine = it_startLine->second;
+
+  if (startLine.startsWith("GET ")) {
     if (isClientLoggedIn(client, header)) {
       client.println(STATUS_303_INFO);
       return;
@@ -505,10 +484,9 @@ void WebTask::page_login(String &header, WiFiClient &client, System &system) {
     client.println(STATUS_200(client, header));
     client.println(page);
     client.println();
-  } else if (header.indexOf("POST") == 0) {
+  } else if (startLine.startsWith("POST ")) {
     // Check password
-
-    String body     = readRequestHeader(client);
+    String body     = readCRLFCRLF(client);
     size_t i        = body.indexOf("Password=");
     String password = body.substring(i + strlen("Password="), body.indexOf("\r\n", i));
 
@@ -545,9 +523,20 @@ void WebTask::page_login(String &header, WiFiClient &client, System &system) {
   }
 }
 
-// Check if client is already logged in. If so, redirect him to info. If not, present login page
+void WebTask::root_redirect(WiFiClient &client, webserver::Header_t &header, System &system) {
+  if (isClientLoggedIn(client, header)) {
+    client.println(STATUS_303_INFO);
+  } else {
+    client.println(STATUS_303_LOGIN);
+  }
+}
 
-bool WebTask::isClientLoggedIn(const WiFiClient &client, const String &header) const {
+void WebTask::style_css(WiFiClient &client, webserver::Header_t &header, System &system) {
+  client.println("HTTP/1.1 200 OK\r\nContent-type:text/css\r\nConnection: close\r\n");
+  client.println(loadPage("/style.css"));
+}
+
+bool WebTask::isClientLoggedIn(const WiFiClient &client, const webserver::Header_t &header) const {
   std::map<uint32_t, struct session_cookie>::const_iterator it = connected_clients.find(client.remoteIP());
   if ((it != connected_clients.end()) && getSessionCookie(header).equals(it->second.value) && (millis() - it->second.timestamp < SESSION_LIFETIME)) {
     return true;
@@ -555,21 +544,21 @@ bool WebTask::isClientLoggedIn(const WiFiClient &client, const String &header) c
   return false;
 }
 
-String WebTask::getSessionCookie(const String &header) const {
-  if (header.indexOf("Cookie: ") < 0) {
+String WebTask::getSessionCookie(const webserver::Header_t &header) const {
+  webserver::Header_t::const_iterator it_cookie = header.find("Cookie");
+  if (it_cookie == header.cend()) {
     return String();
   }
-  size_t i          = header.indexOf("Cookie: ");
-  String cookieLine = header.substring(i + strlen("Cookie: "), header.indexOf("\r\n", i));
 
-  i = cookieLine.indexOf("session=") + strlen("session=");
+  String cookieLine = it_cookie->second;
+  cookieLine        = cookieLine.substring(cookieLine.indexOf("session=") + strlen("session="));
   String session;
   size_t j = 0;
 
   // Read the line while we have alphanum chars.
   while (true) {
-    if (isalnum(cookieLine.charAt(i + j))) {
-      session += cookieLine.charAt(i + j);
+    if (isalnum(cookieLine.charAt(j))) {
+      session += cookieLine.charAt(j);
     } else {
       break;
     }
@@ -586,7 +575,7 @@ String WebTask::session_cookie::creationString() {
 WebTask::session_cookie::session_cookie(unsigned long t, String val) : value(val), timestamp(t) {
 }
 
-String WebTask::STATUS_200(WiFiClient &client, const String &header) {
+String WebTask::STATUS_200(WiFiClient &client, const webserver::Header_t &header) {
   String response = "HTTP/1.1 200 OK\r\nContent-type:text/html\r\nConnection: close\r\n";
   if (isClientLoggedIn(client, header)) {
     session_cookie cookie                                       = session_cookie(millis(), connected_clients.find(client.remoteIP())->second.value);
@@ -595,30 +584,4 @@ String WebTask::STATUS_200(WiFiClient &client, const String &header) {
   } else {
     return response;
   }
-}
-
-webTarget::webTarget(String line) {
-  if (line.startsWith("GET ")) {
-    method   = GET;
-    resource = line.substring(4, line.indexOf(" HTTP/"));
-    version  = line.substring(line.indexOf(" HTTP/") + 6, line.indexOf("\r\n"));
-  } else if (line.startsWith("POST ")) {
-    method   = POST;
-    resource = line.substring(5, line.indexOf(" HTTP/"));
-    version  = line.substring(line.indexOf(" HTTP/") + 6, line.indexOf("\r\n"));
-  } else {
-    method = NOT_SUPPORTED;
-  }
-}
-
-webTarget::Method webTarget::getMethod() {
-  return method;
-}
-
-String webTarget::getResource() {
-  return resource;
-}
-
-String webTarget::getVersion() {
-  return version;
 }
