@@ -204,13 +204,13 @@ void WebTask::enableota_page(WiFiClient &client, webserver::Header_t &header, Sy
     if (it->getTaskId() == TaskOta) {
       ((OTATask *)it)->enableOTA(5 * 60 * 1000); // Enabling OTA for 5 minutes
       system.getLogger().log(logging::LoggerLevel::LOGGER_LEVEL_INFO, getName(), "User enabled OTA for 5 minutes via web interface");
-      page.replace("$$STATUS$$", "<p>OTA Enabled for 5 minutes.</p>");
+      page.replace("$$STATUS$$", "<p style=\"text-align: center; color: white;\">OTA Enabled for 5 minutes.</p>");
 
       break;
     }
   }
 
-  page.replace("$$STATUS$$", "<p>There was an error with the OTA task.</p>");
+  page.replace("$$STATUS$$", "<p style=\"text-align: center; color: red;\">There was an error with the OTA task.</p>");
 
   client.println(page);
 }
