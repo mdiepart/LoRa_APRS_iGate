@@ -16,10 +16,6 @@ bool WifiTask::setup(System &system) {
   // Don't save WiFi configuration in flash
   WiFi.persistent(false);
 
-  // Set WiFi to station mode
-  WiFi.mode(WIFI_STA);
-
-  WiFi.onEvent(WiFiEvent);
   if (system.getUserConfig()->network.hostname.overwrite) {
     WiFi.setHostname(system.getUserConfig()->network.hostname.name.c_str());
   } else {
@@ -29,6 +25,11 @@ bool WifiTask::setup(System &system) {
   if (!system.getUserConfig()->network.DHCP) {
     WiFi.config(system.getUserConfig()->network.static_.ip, system.getUserConfig()->network.static_.gateway, system.getUserConfig()->network.static_.subnet, system.getUserConfig()->network.static_.dns1, system.getUserConfig()->network.static_.dns2);
   }
+
+  // Set WiFi to station mode
+  WiFi.mode(WIFI_STA);
+
+  WiFi.onEvent(WiFiEvent);
 
   for (Configuration::Wifi::AP ap : system.getUserConfig()->wifi.APs) {
     system.log_debug(getName(), "Looking for AP: %s", ap.SSID.c_str());
