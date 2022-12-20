@@ -46,10 +46,22 @@ bool WebTask::setup(System &system) {
   }
 
   system.log_info(getName(), "Web server started.");
+  isServerStarted = true;
   return true;
 }
 
 bool WebTask::loop(System &system) {
+  if (isServerStarted && !system.isWifiOrEthConnected()) {
+    http_server.close();
+    isServerStarted = false;
+    system.log_warn(getName(), "Closed HTTP server because network connection was lost.");
+  }
+
+  if (!isServerStarted && system.isWifiOrEthConnected()) {
+    http_server.begin();
+    isServerStarted = true;
+    system.log_warn(getName(), "Network connection recovered, http server restarted.");
+  }
 
   // Check for too old client sessions every 10s
   static uint32_t timeSinceRefresh = 0;
@@ -59,6 +71,10 @@ bool WebTask::loop(System &system) {
         connected_clients.erase(client.first);
       }
     }
+  }
+
+  if (!isServerStarted) {
+    return true;
   }
 
   // Check if we have a client available and serve it

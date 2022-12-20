@@ -26,7 +26,7 @@ private:
   WiFiServer http_server;
   webserver  Webserver;
   // System    *system;
-
+  bool               isServerStarted  = false;
   const unsigned int TIMEOUT          = 5;      // Timeout in s
   const unsigned int SESSION_LIFETIME = 900000; // user session lifetime in ms (900 000 is 15 minutes)
   const String       STATUS_303_INFO  = String("HTTP/1.1 303 See Other\r\nLocation: /info\r\nContent-type:text/html\r\nConnection: close\r\n");
