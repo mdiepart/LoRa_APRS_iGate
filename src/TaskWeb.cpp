@@ -45,7 +45,7 @@ bool WebTask::setup(System &system) {
     Webserver.addTarget(webserver::POST, "/uploadFW", fn_uploadFW); // /uploadFW; auth
   }
 
-  system.getLogger().log(logging::LoggerLevel::LOGGER_LEVEL_INFO, getName(), "Web server started.");
+  system.log_info(getName(), "Web server started.");
   return true;
 }
 
@@ -66,7 +66,7 @@ bool WebTask::loop(System &system) {
 
   if (client) {
     client.setTimeout(TIMEOUT);
-    system.getLogger().log(logging::LoggerLevel::LOGGER_LEVEL_INFO, getName(), "new client with IP %s.", client.localIP().toString().c_str());
+    system.log_info(getName(), "new client with IP %s.", client.localIP().toString().c_str());
 
     Webserver.serve(client, system);
 
@@ -203,7 +203,7 @@ void WebTask::enableota_page(WiFiClient &client, webserver::Header_t &header, Sy
   for (Task *it : system.getTaskManager().getTasks()) {
     if (it->getTaskId() == TaskOta) {
       ((OTATask *)it)->enableOTA(5 * 60 * 1000); // Enabling OTA for 5 minutes
-      system.getLogger().log(logging::LoggerLevel::LOGGER_LEVEL_INFO, getName(), "User enabled OTA for 5 minutes via web interface");
+      system.log_info(getName(), "User enabled OTA for 5 minutes via web interface");
       page.replace("$$STATUS$$", "<p style=\"text-align: center; color: white;\">OTA Enabled for 5 minutes.</p>");
 
       break;
@@ -228,14 +228,14 @@ void WebTask::uploadfw_page(WiFiClient &client, webserver::Header_t &header, Sys
   webserver::Header_t::const_iterator it_content_type = header.find("Content-Type");
   if (it_content_type == header.cend()) {
     // This header does not describe data the way we expect it
-    system.getLogger().log(logging::LoggerLevel::LOGGER_LEVEL_DEBUG, getName(), "No content type in header.");
+    system.log_debug(getName(), "No content type in header.");
     client.println(STATUS_400);
     return;
   } else {
     // Fetch boundary token
     String content_type = it_content_type->second;
     boundary_token      = "--" + content_type.substring(content_type.indexOf(str_boundary) + str_boundary.length());
-    system.getLogger().log(logging::LoggerLevel::LOGGER_LEVEL_DEBUG, getName(), "The boundary to compare with is %s.", boundary_token.c_str());
+    system.log_debug(getName(), "The boundary to compare with is %s.", boundary_token.c_str());
   }
 
   // Finished parsing header. Now parsing form data
@@ -252,19 +252,19 @@ void WebTask::uploadfw_page(WiFiClient &client, webserver::Header_t &header, Sys
   // Read a line. It should be the first boundary of the form-data
   len                  = client.readBytesUntil('\n', read_buffer, BUFFER_LENGTH);
   read_buffer[len - 1] = '\0'; // Replace '\r' by '\0'
-  system.getLogger().log(logging::LoggerLevel::LOGGER_LEVEL_DEBUG, "uploadFW", "boundary token = %s, buffer = %s.", boundary_token.c_str(), read_buffer);
+  system.log_debug("uploadFW", "boundary token = %s, buffer = %s.", boundary_token.c_str(), read_buffer);
   if (strcmp(boundary_token.c_str(), (const char *)read_buffer) == 0) { // We found a boundary token. It should be at the beginning of a form part
     while (client.available() && esp_error == ESP_OK) {
       String header = readCRLFCRLF(client); // Read the header that is just after the boundary
       // Determine field name
       name     = header.substring(header.indexOf("name=\"") + strlen("name=\""), header.indexOf("\"; filename"));
       filename = header.substring(header.indexOf("filename=\"") + strlen("filename=\""), header.indexOf("\"\r\n"));
-      system.getLogger().log(logging::LoggerLevel::LOGGER_LEVEL_DEBUG, getName(), "Section with name=\"%s\" and filename = \"%s\".", name.c_str(), filename.c_str());
+      system.log_debug(getName(), "Section with name=\"%s\" and filename = \"%s\".", name.c_str(), filename.c_str());
 
       if (name.equals("Firmware_File")) {
         // if no filename, we skip firmware upload
         if (filename.isEmpty()) {
-          system.getLogger().log(logging::LoggerLevel::LOGGER_LEVEL_DEBUG, getName(), "No firmware file, skipping.");
+          system.log_debug(getName(), "No firmware file, skipping.");
           continue;
         }
 
@@ -274,7 +274,7 @@ void WebTask::uploadfw_page(WiFiClient &client, webserver::Header_t &header, Sys
         esp_error                             = esp_ota_begin(next_part, OTA_SIZE_UNKNOWN, &ota_handle);
 
         if (esp_error != ESP_OK) {
-          system.getLogger().log(logging::LoggerLevel::LOGGER_LEVEL_WARN, getName(), "Error starting OTA.");
+          system.log_warn(getName(), "Error starting OTA.");
           break;
         }
 
@@ -286,14 +286,14 @@ void WebTask::uploadfw_page(WiFiClient &client, webserver::Header_t &header, Sys
           if (client.available()) {
             len = client.readBytesUntil('\n', read_buffer, BUFFER_LENGTH);
           } else {
-            system.getLogger().log(logging::LoggerLevel::LOGGER_LEVEL_DEBUG, getName(), "No more bytes available.\n\n\n");
+            system.log_debug(getName(), "No more bytes available.\n\n\n");
             break;
           }
 
           if (len == 0) {
             read_buffer[0] = '\n';
             len            = 1 + client.readBytesUntil('\n', read_buffer + 1, BUFFER_LENGTH - 1);
-            // system->getLogger().log(logging::LoggerLevel::LOGGER_LEVEL_INFO, getName(), "read with len < 1");
+            // system->log_info(getName(), "read with len < 1");
           }
 
           // If we have read the boundary
@@ -320,7 +320,7 @@ void WebTask::uploadfw_page(WiFiClient &client, webserver::Header_t &header, Sys
             }
 
             if (len < 0) {
-              system.getLogger().log(logging::LoggerLevel::LOGGER_LEVEL_INFO, getName(), "len < 0");
+              system.log_info(getName(), "len < 0");
             }
             esp_ota_write(ota_handle, data, len);
 
@@ -334,39 +334,39 @@ void WebTask::uploadfw_page(WiFiClient &client, webserver::Header_t &header, Sys
           }
         }
 
-        system.getLogger().log(logging::LoggerLevel::LOGGER_LEVEL_DEBUG, getName(), "Finished parsing binary file. Size is %d", file_size);
+        system.log_debug(getName(), "Finished parsing binary file. Size is %d", file_size);
 
         if (esp_error == ESP_OK) {
           esp_error = esp_ota_end(ota_handle);
         } else {
           // esp_ota_abort(ota_handle);
-          system.getLogger().log(logging::LoggerLevel::LOGGER_LEVEL_DEBUG, getName(), "Error while writing to ota. Code is %d", esp_error);
+          system.log_debug(getName(), "Error while writing to ota. Code is %d", esp_error);
         }
 
         switch (esp_error) {
         case ESP_OK:
-          system.getLogger().log(logging::LoggerLevel::LOGGER_LEVEL_DEBUG, getName(), "OTA Succeeded.");
+          system.log_debug(getName(), "OTA Succeeded.");
           esp_ota_set_boot_partition(next_part);
           break;
         case ESP_ERR_NOT_FOUND:
-          system.getLogger().log(logging::LoggerLevel::LOGGER_LEVEL_WARN, getName(), "ESP_ERR_NOT_FOUND.");
+          system.log_warn(getName(), "ESP_ERR_NOT_FOUND.");
           break;
         case ESP_ERR_INVALID_ARG:
-          system.getLogger().log(logging::LoggerLevel::LOGGER_LEVEL_WARN, getName(), "ESP_ERR_INVALID_ARG.");
+          system.log_warn(getName(), "ESP_ERR_INVALID_ARG.");
           break;
         case ESP_ERR_OTA_VALIDATE_FAILED:
-          system.getLogger().log(logging::LoggerLevel::LOGGER_LEVEL_WARN, getName(), "ESP_ERR_OTA_VALIDATE_FAILED.");
+          system.log_warn(getName(), "ESP_ERR_OTA_VALIDATE_FAILED.");
           break;
         case ESP_ERR_INVALID_STATE:
-          system.getLogger().log(logging::LoggerLevel::LOGGER_LEVEL_WARN, getName(), "ESP_ERR_INVALID_STATE.");
+          system.log_warn(getName(), "ESP_ERR_INVALID_STATE.");
           break;
         default:
-          system.getLogger().log(logging::LoggerLevel::LOGGER_LEVEL_WARN, getName(), "ESP OTA unknown error...");
+          system.log_warn(getName(), "ESP OTA unknown error...");
           break;
         }
       } else if (name.equals("SPIFFS_File")) {
         if (filename.isEmpty()) { // Do not update spiffs if we have no SPIFFS file
-          system.getLogger().log(logging::LoggerLevel::LOGGER_LEVEL_DEBUG, getName(), "No SPIFFS file uploaded. Skipping.");
+          system.log_debug(getName(), "No SPIFFS file uploaded. Skipping.");
           continue;
         }
 
@@ -378,7 +378,7 @@ void WebTask::uploadfw_page(WiFiClient &client, webserver::Header_t &header, Sys
 
         esp_error = esp_partition_erase_range(spiffs_part, 0, spiffs_part->size);
         if (esp_error != ESP_OK) {
-          system.getLogger().log(logging::LoggerLevel::LOGGER_LEVEL_WARN, getName(), "Impossible to erase SPIFFS partition...");
+          system.log_warn(getName(), "Impossible to erase SPIFFS partition...");
           break;
         }
 
@@ -430,18 +430,18 @@ void WebTask::uploadfw_page(WiFiClient &client, webserver::Header_t &header, Sys
         }
 
         if (esp_error != ESP_OK) {
-          system.getLogger().log(logging::LoggerLevel::LOGGER_LEVEL_WARN, getName(), "Error while writing to spiffs partition.");
+          system.log_warn(getName(), "Error while writing to spiffs partition.");
           break;
         }
       }
     } /* else if ((boundary_token + "--").equals(buffer)) {
        // we found the end of form boundary
-       system->getLogger().log(logging::LoggerLevel::LOGGER_LEVEL_DEBUG, getName(), "Finished parsing full request.");
+       system->log_debug(getName(), "Finished parsing full request.");
        break;
      }*/
   } else {
     // No token where one is expected
-    system.getLogger().log(logging::LoggerLevel::LOGGER_LEVEL_WARN, getName(), "Could not find firmware data.");
+    system.log_warn(getName(), "Could not find firmware data.");
 
     client.println(STATUS_400);
     return;
@@ -457,7 +457,7 @@ void WebTask::uploadfw_page(WiFiClient &client, webserver::Header_t &header, Sys
                  "</body></html>\r\n");
 
   if (esp_error == ESP_OK) {
-    system.getLogger().log(logging::LoggerLevel::LOGGER_LEVEL_WARN, getName(), "ESP OTA succeeded. Restarting in 2s.");
+    system.log_warn(getName(), "ESP OTA succeeded. Restarting in 2s.");
     client.stop();
     esp_restart();
   }

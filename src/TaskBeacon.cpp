@@ -34,7 +34,7 @@ bool BeaconTask::setup(System &system) {
     if (system.getBoardConfig()->GpsRx != 0) {
       _ss.begin(9600, SERIAL_8N1, system.getBoardConfig()->GpsTx, system.getBoardConfig()->GpsRx);
     } else {
-      system.getLogger().log(logging::LoggerLevel::LOGGER_LEVEL_INFO, getName(), "NO GPS found.");
+      system.log_info(getName(), "NO GPS found.");
       _useGps = false;
     }
   }
@@ -110,7 +110,7 @@ bool BeaconTask::sendBeacon(System &system) {
   }
   _beaconMsg->getBody()->setData(String("=") + create_lat_aprs(lat) + "L" + create_long_aprs(lng) + "&" + system.getUserConfig()->beacon.message);
 
-  system.getLogger().log(logging::LoggerLevel::LOGGER_LEVEL_INFO, getName(), "[%s] %s", timeString().c_str(), _beaconMsg->encode().c_str());
+  system.log_info(getName(), "[%s] %s", timeString().c_str(), _beaconMsg->encode().c_str());
 
   if (system.getUserConfig()->aprs_is.active) {
     _toAprsIs.addElement(_beaconMsg);

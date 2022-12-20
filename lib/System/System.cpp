@@ -46,3 +46,31 @@ void System::connectedViaWifi(bool status) {
 logging::Logger &System::getLogger() {
   return _logger;
 }
+
+void System::log_debug(String name, const char *fmt, ...) {
+  va_list args;
+  va_start(args, fmt);
+  getLogger().vlogf(logging::LoggerLevel::LOGGER_LEVEL_DEBUG, name, fmt, args);
+  va_end(args);
+}
+
+void System::log_info(String name, const char *fmt, ...) {
+  va_list args;
+  va_start(args, fmt);
+  getLogger().vlogf(logging::LoggerLevel::LOGGER_LEVEL_INFO, name, fmt, args);
+  va_end(args);
+}
+
+void System::log_error(String name, const char *fmt, ...) {
+  va_list args;
+  va_start(args, fmt);
+  getLogger().vlogf(logging::LoggerLevel::LOGGER_LEVEL_ERROR, name, fmt, args);
+  va_end(args);
+}
+
+void System::log_warn(String name, const char *fmt, ...) {
+  va_list args;
+  va_start(args, fmt);
+  getLogger().vlogf(logging::LoggerLevel::LOGGER_LEVEL_WARN, name, fmt, args);
+  va_end(args);
+}

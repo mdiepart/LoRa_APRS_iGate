@@ -35,18 +35,18 @@ bool RouterTask::loop(System &system) {
 
         aprsIsMsg->setPath(path + "qAO," + system.getUserConfig()->callsign);
 
-        system.getLogger().log(logging::LoggerLevel::LOGGER_LEVEL_INFO, getName(), "APRS-IS: %s", aprsIsMsg->toString().c_str());
+        system.log_info(getName(), "APRS-IS: %s", aprsIsMsg->toString().c_str());
         _toAprsIs.addElement(aprsIsMsg);
       } else {
-        system.getLogger().log(logging::LoggerLevel::LOGGER_LEVEL_INFO, getName(), "APRS-IS: no forward => RFonly");
+        system.log_info(getName(), "APRS-IS: no forward => RFonly");
       }
     } else {
       if (!system.getUserConfig()->aprs_is.active) {
-        system.getLogger().log(logging::LoggerLevel::LOGGER_LEVEL_INFO, getName(), "APRS-IS: disabled");
+        system.log_info(getName(), "APRS-IS: disabled");
       }
 
       if (modemMsg->getSource() == system.getUserConfig()->callsign) {
-        system.getLogger().log(logging::LoggerLevel::LOGGER_LEVEL_INFO, getName(), "APRS-IS: no forward => own packet received");
+        system.log_info(getName(), "APRS-IS: no forward => own packet received");
       }
     }
 
@@ -59,7 +59,7 @@ bool RouterTask::loop(System &system) {
         // fixme
         digiMsg->setPath(system.getUserConfig()->callsign + "*");
 
-        system.getLogger().log(logging::LoggerLevel::LOGGER_LEVEL_INFO, getName(), "DIGI: %s", digiMsg->toString().c_str());
+        system.log_info(getName(), "DIGI: %s", digiMsg->toString().c_str());
 
         _toModem.addElement(digiMsg);
       }

@@ -19,15 +19,20 @@ public:
 
   BoardConfig const *const   getBoardConfig() const;
   Configuration const *const getUserConfig() const;
-  TaskManager &              getTaskManager();
-  Display &                  getDisplay();
+  TaskManager               &getTaskManager();
+  Display                   &getDisplay();
   bool                       isWifiOrEthConnected() const;
   void                       connectedViaEth(bool status);
   void                       connectedViaWifi(bool status);
-  logging::Logger &          getLogger();
+  logging::Logger           &getLogger();
+
+  void __attribute__((format(printf, 3, 4))) log_info(String name, const char *fmt, ...);
+  void __attribute__((format(printf, 3, 4))) log_debug(String name, const char *fmt, ...);
+  void __attribute__((format(printf, 3, 4))) log_error(String name, const char *fmt, ...);
+  void __attribute__((format(printf, 3, 4))) log_warn(String name, const char *fmt, ...);
 
 private:
-  BoardConfig const *  _boardConfig;
+  BoardConfig const   *_boardConfig;
   Configuration const *_userConfig;
   TaskManager          _taskManager;
   Display              _display;

@@ -19,10 +19,10 @@ bool OTATask::setup(System &system) {
         } else { // U_SPIFFS
           type = "filesystem";
         }
-        system.getLogger().log(logging::LoggerLevel::LOGGER_LEVEL_INFO, getName(), "Start updating %s. please wait, this process is taking some time!", type.c_str());
+        system.log_info(getName(), "Start updating %s. please wait, this process is taking some time!", type.c_str());
       })
       .onEnd([&]() {
-        system.getLogger().log(logging::LoggerLevel::LOGGER_LEVEL_INFO, getName(), "OTA End");
+        system.log_info(getName(), "OTA End");
       })
       .onError([&](ota_error_t error) {
         String error_str;
@@ -37,7 +37,7 @@ bool OTATask::setup(System &system) {
         } else if (error == OTA_END_ERROR) {
           error_str = "End Failed";
         }
-        system.getLogger().log(logging::LoggerLevel::LOGGER_LEVEL_ERROR, getName(), "Error[%d]: %s", error, error_str.c_str());
+        system.log_error(getName(), "Error[%d]: %s", error, error_str.c_str());
       })
       .onProgress([&](unsigned int received, unsigned int total_size) {
         esp_task_wdt_reset();
@@ -50,11 +50,11 @@ bool OTATask::setup(System &system) {
 
   if (!system.getUserConfig()->ota.password.isEmpty()) {
     _ota.setPassword(system.getUserConfig()->ota.password.c_str());
-    system.getLogger().log(logging::LoggerLevel::LOGGER_LEVEL_INFO, getName(), "Set OTA password to %s", system.getUserConfig()->ota.password.c_str());
+    system.log_info(getName(), "Set OTA password to %s", system.getUserConfig()->ota.password.c_str());
   }
 
   _ota.setPort((uint16_t)system.getUserConfig()->ota.port);
-  system.getLogger().log(logging::LoggerLevel::LOGGER_LEVEL_INFO, getName(), "Set OTA port to %u", system.getUserConfig()->ota.port);
+  system.log_info(getName(), "Set OTA port to %u", system.getUserConfig()->ota.port);
 
   if (system.getUserConfig()->ota.active) {
     if (system.getUserConfig()->ota.enableViaWeb) {
@@ -76,7 +76,7 @@ bool OTATask::loop(System &system) {
 
   if (_status == OTA_Enabled && (millis() - _enable_time >= _timeout)) {
     _status = OTA_Disabled;
-    system.getLogger().log(logging::LoggerLevel::LOGGER_LEVEL_INFO, getName(), "OTA Timed out. Disabling OTA.");
+    system.log_info(getName(), "OTA Timed out. Disabling OTA.");
   }
 
   if (!_beginCalled && (_status == OTA_ForceEnabled || _status == OTA_Enabled)) {
