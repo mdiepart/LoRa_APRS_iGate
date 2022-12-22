@@ -57,6 +57,13 @@ bool WebTask::loop(System &system) {
       if (target.getMethod() == webTarget::NOT_SUPPORTED) {
         // 501 Not Implemented
         client.println("HTTP/1.1 501 Not Implemented\r\nContent-type:text/html\r\nConnection: close\r\n");
+      } else if (target.getResource().equals("/style.css")) {
+        if (target.getMethod() == webTarget::GET) {
+          client.println("HTTP/1.1 200 OK\r\nContent-type:text/css\r\nConnection: close\r\n");
+          client.println(loadPage("/style.css"));
+        } else {
+          client.println("HTTP/1.1 405 Method Not Allowed\r\nAllow: GET\r\nContent-type:text/html\r\nConnection: close\r\n");
+        }
       } else if (target.getResource().equals("/login")) {
         page_login(header, client, system);
       } else if (!isClientLoggedIn(client, header)) {

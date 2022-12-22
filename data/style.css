@@ -1,0 +1,49 @@
+html {
+    font-family: Helvetica;
+    display: inline-block;
+}
+
+.centered {
+    text-align: center;
+    margin: auto;
+    width: 100%;
+}
+
+.login_div {
+    display: inline-block;
+    border: 1pt solid black;
+    padding: 1cm;
+    padding-top: 0.5cm;
+    vertical-align: baseline;
+    margin-top: 2cm;
+}
+
+input {
+    margin-top: 5pt;
+}
+
+.warning {
+    color: red;
+    font-style: italic;
+    font-size: 0.9em;
+}
+
+.task {
+    border: none;
+    padding: 16px 40px;
+    text-decoration: none;
+    margin: 2px;
+    line-height: normal;
+}
+
+.task.ok {
+    color: mediumseagreen;
+}
+
+.task.warning {
+    color: tomato;
+}
+
+.task.error {
+    color: firebrick
+}
