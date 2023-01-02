@@ -14,8 +14,7 @@ enum TaskNames {
   TaskMQTT,
   TaskBeacon,
   TaskWeb,
-  TaskWebClient1,
-  TastWebClient8 = TaskWebClient1+7, //Allocates 8 task IDs for 8 potential web clients
+  TaskWebClient,
   TaskPacketLogger,
   TaskSize,
 };
