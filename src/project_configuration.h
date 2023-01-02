@@ -163,24 +163,35 @@ public:
     String password;
   };
 
+  class PacketLogger {
+  public:
+    PacketLogger() : active(true), nb_lines(100), nb_files(1) {
+    }
+
+    bool         active;
+    unsigned int nb_lines;
+    unsigned int nb_files;
+  };
+
   Configuration() : callsign("NOCALL-10"), ntpServer("pool.ntp.org"), board("") {
   }
 
-  String  callsign;
-  Network network;
-  Wifi    wifi;
-  Beacon  beacon;
-  APRS_IS aprs_is;
-  Digi    digi;
-  LoRa    lora;
-  Display display;
-  Ftp     ftp;
-  MQTT    mqtt;
-  Syslog  syslog;
-  Web     web;
-  OTA     ota;
-  String  ntpServer;
-  String  board;
+  String       callsign;
+  Network      network;
+  Wifi         wifi;
+  Beacon       beacon;
+  APRS_IS      aprs_is;
+  Digi         digi;
+  LoRa         lora;
+  Display      display;
+  Ftp          ftp;
+  MQTT         mqtt;
+  Syslog       syslog;
+  Web          web;
+  OTA          ota;
+  PacketLogger packetLogger;
+  String       ntpServer;
+  String       board;
 };
 
 class ProjectConfigurationManagement : public ConfigurationManagement {

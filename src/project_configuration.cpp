@@ -123,6 +123,15 @@ void ProjectConfigurationManagement::readProjectConfiguration(DynamicJsonDocumen
       conf.ota.enableViaWeb = data["OTA"]["enableViaWeb"] | false;
   }
 
+  if (data.containsKey("packet_logger")) {
+    if (data["packet_logger"].containsKey("active"))
+      conf.packetLogger.active = data["packet_logger"]["active"] | true;
+    if (data["packet_logger"].containsKey("number_lines"))
+      conf.packetLogger.nb_lines = data["packet_logger"]["number_lines"] | 100;
+    if (data["packet_logger"].containsKey("files_history"))
+      conf.packetLogger.nb_files = data["packet_logger"]["files_history"] | 1;
+  }
+
   if (data.containsKey("ntp_server"))
     conf.ntpServer = data["ntp_server"].as<String>();
 
@@ -199,6 +208,10 @@ void ProjectConfigurationManagement::writeProjectConfiguration(Configuration &co
   data["OTA"]["port"]         = conf.ota.port;
   data["OTA"]["password"]     = conf.ota.password;
   data["OTA"]["enableViaWeb"] = conf.ota.enableViaWeb;
+
+  data["packet_logger"]["active"]        = conf.packetLogger.active;
+  data["packet_logger"]["number_lines"]  = conf.packetLogger.nb_lines;
+  data["packet_logger"]["files_history"] = conf.packetLogger.nb_files;
 
   data["ntp_server"] = conf.ntpServer;
 

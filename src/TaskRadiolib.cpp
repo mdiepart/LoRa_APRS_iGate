@@ -2,6 +2,7 @@
 #include <TimeLib.h>
 #include <logger.h>
 
+#include "TaskPacketLogger.h"
 #include "TaskRadiolib.h"
 
 RadiolibTask::RadiolibTask(TaskQueue<std::shared_ptr<APRSMessage>> &fromModem, TaskQueue<std::shared_ptr<APRSMessage>> &toModem) : Task(TASK_RADIOLIB, TaskRadiolib), _fromModem(fromModem), _toModem(toModem) {
@@ -130,7 +131,11 @@ bool RadiolibTask::loop(System &system) {
       String str;
       int    state = radio->readData(str);
 
-      if (state != RADIOLIB_ERR_NONE) {
+      if (state == RADIOLIB_ERR_CRC_MISMATCH) {
+        // Log an error
+        system.log_error(getName(), "[%s] Received corrupt packet (CRC check failed)", timeString().c_str());
+        system.getPacketLogger()->logPacket("", "", "", "CRC error", radio->getRSSI(), radio->getSNR(), radio->getFrequencyError());
+      } else if (state != RADIOLIB_ERR_NONE) {
         system.log_error(getName(), "[%s] readData failed, code %d", timeString().c_str(), state);
       } else {
         if (str.substring(0, 3) != "<\xff\x01") {
@@ -141,6 +146,11 @@ bool RadiolibTask::loop(System &system) {
           _fromModem.addElement(msg);
           system.log_debug(getName(), "[%s] Received packet '%s' with RSSI %.0fdBm, SNR %.2fdB and FreqErr %fHz", timeString().c_str(), msg->toString().c_str(), radio->getRSSI(), radio->getSNR(), -radio->getFrequencyError());
           system.getDisplay().addFrame(std::shared_ptr<DisplayFrame>(new TextFrame("LoRa", msg->toString().c_str())));
+          TimeElements tm;
+          breakTime(now(), tm);
+          char timestamp[32];
+          snprintf(timestamp, 31, "%04d-%02d-%02dT%02d:%02d:%02dZ", 1970 + tm.Year, tm.Month, tm.Day, tm.Hour, tm.Minute, tm.Second);
+          system.getPacketLogger()->logPacket(msg->getSource(), msg->getDestination(), msg->getPath(), msg->getBody()->getData(), radio->getRSSI(), radio->getSNR(), radio->getFrequencyError());
         }
       }
       operationDone = false;

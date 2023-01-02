@@ -91,5 +91,10 @@
 		"port": 3232,
 		"password": "OTAPassword"
 	},
+	"packet_logger": {
+		"active": true,
+		"number_lines": 100,
+		"files_history": 9
+	},
 	"ntp_server": "pool.ntp.org"
 }

@@ -16,6 +16,7 @@
 #include "TaskMQTT.h"
 #include "TaskNTP.h"
 #include "TaskOTA.h"
+#include "TaskPacketLogger.h"
 #include "TaskRadiolib.h"
 #include "TaskRouter.h"
 #include "TaskWeb.h"
@@ -38,17 +39,18 @@ Configuration userConfig;
 
 DisplayTask displayTask;
 // ModemTask   modemTask(fromModem, toModem);
-RadiolibTask modemTask(fromModem, toModem);
-EthTask      ethTask;
-WifiTask     wifiTask;
-OTATask      otaTask;
-NTPTask      ntpTask;
-FTPTask      ftpTask;
-MQTTTask     mqttTask(toMQTT);
-WebTask      webTask;
-AprsIsTask   aprsIsTask(toAprsIs);
-RouterTask   routerTask(fromModem, toModem, toAprsIs, toMQTT);
-BeaconTask   beaconTask(toModem, toAprsIs);
+RadiolibTask     modemTask(fromModem, toModem);
+EthTask          ethTask;
+WifiTask         wifiTask;
+OTATask          otaTask;
+NTPTask          ntpTask;
+FTPTask          ftpTask;
+MQTTTask         mqttTask(toMQTT);
+WebTask          webTask;
+AprsIsTask       aprsIsTask(toAprsIs);
+RouterTask       routerTask(fromModem, toModem, toAprsIs, toMQTT);
+BeaconTask       beaconTask(toModem, toAprsIs);
+PacketLoggerTask packetLoggerTask("packets.log");
 
 void setup() {
   esp_task_wdt_init(10, true);
@@ -128,6 +130,9 @@ void setup() {
   LoRaSystem.getTaskManager().addTask(&modemTask);
   LoRaSystem.getTaskManager().addTask(&routerTask);
   LoRaSystem.getTaskManager().addTask(&beaconTask);
+  LoRaSystem.getTaskManager().addAlwaysRunTask(&packetLoggerTask);
+
+  LoRaSystem.setPacketLogger(&packetLoggerTask);
 
   bool tcpip = false;
 
