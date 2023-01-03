@@ -130,9 +130,6 @@ void setup() {
   LoRaSystem.getTaskManager().addTask(&modemTask);
   LoRaSystem.getTaskManager().addTask(&routerTask);
   LoRaSystem.getTaskManager().addTask(&beaconTask);
-  LoRaSystem.getTaskManager().addAlwaysRunTask(&packetLoggerTask);
-
-  LoRaSystem.setPacketLogger(&packetLoggerTask);
 
   bool tcpip = false;
 
@@ -164,6 +161,9 @@ void setup() {
       LoRaSystem.getTaskManager().addAlwaysRunTask(&webTask);
     }
   }
+
+  LoRaSystem.getTaskManager().addAlwaysRunTask(&packetLoggerTask);
+  LoRaSystem.setPacketLogger(&packetLoggerTask);
 
   esp_task_wdt_reset();
   LoRaSystem.getTaskManager().setup(LoRaSystem);

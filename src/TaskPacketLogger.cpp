@@ -9,9 +9,10 @@
 #include "project_configuration.h"
 
 PacketLoggerTask::PacketLoggerTask(String filename) : Task(TASK_PACKET_LOGGER, TaskPacketLogger) {
-  this->filename  = filename;
-  this->enabled   = true;
-  this->log_queue = std::queue<log_line>();
+  this->filename = filename;
+  enabled        = true;
+  log_queue      = std::queue<log_line>();
+  total_count    = 0;
 }
 
 PacketLoggerTask::~PacketLoggerTask() {
@@ -23,13 +24,21 @@ bool PacketLoggerTask::setup(System &system) {
   if (!system.getUserConfig()->packetLogger.active || filename == "" || nb_lines == 0) {
     system.log_debug(getName(), "Disabled packet logger.");
     enabled = false;
+    if (system.getUserConfig()->packetLogger.active) {
+      _state = Error;
+    } else {
+      _state = Okay;
+    }
+    _stateInfo = "Disabled";
     return true;
   }
 
   system.log_debug(getName(), "Setting up packetLogger. Filename is %s. Number of lines is %d. Number of history files is %d.", filename.c_str(), nb_lines, nb_files);
   if (!SPIFFS.begin()) {
     system.log_error(getName(), "Could not start SPIFFS...");
-    enabled = false;
+    _state     = Error;
+    _stateInfo = "Could not start SPIFFS";
+    enabled    = false;
     return false;
   } else {
     system.log_debug(getName(), "SPIFFS started.");
@@ -41,11 +50,14 @@ bool PacketLoggerTask::setup(System &system) {
     csv_file = SPIFFS.open("/" + filename, "w", true);
     if (!csv_file) {
       system.log_debug(getName(), "Could not create the file...");
-      enabled = false;
+      _state     = Error;
+      _stateInfo = "Could not create log file";
+      enabled    = false;
       return false;
     }
     csv_file.println(HEADER);
     csv_file.close();
+    _stateInfo = "Running";
     return true;
   } else {
     csv_file = SPIFFS.open("/" + filename, "r");
@@ -60,7 +72,9 @@ bool PacketLoggerTask::setup(System &system) {
       csv_file = SPIFFS.open("/" + filename, "w", true);
       if (!csv_file) {
         system.log_error(getName(), "Could not re-open file after having removed it...");
-        enabled = false;
+        _state     = Error;
+        _stateInfo = "Could not create log file";
+        enabled    = false;
         return false;
       } else {
         system.log_debug(getName(), "File recreated successfully.");
@@ -68,6 +82,7 @@ bool PacketLoggerTask::setup(System &system) {
       size_t written = csv_file.println(HEADER);
       csv_file.flush();
       system.log_debug(getName(), "Written %d bytes to file.", written);
+      _stateInfo = "Running";
       return true;
     } else {
       // File exists, look for last '\n'
@@ -82,6 +97,7 @@ bool PacketLoggerTask::setup(System &system) {
           csv_file = SPIFFS.open("/" + filename, "w", true);
           csv_file.println(HEADER);
           csv_file.close();
+          _stateInfo = "Running";
           return true;
         }
       }
@@ -96,7 +112,7 @@ bool PacketLoggerTask::setup(System &system) {
       csv_file.close();
     }
   }
-
+  _stateInfo = "Running";
   return true;
 }
 
@@ -126,8 +142,10 @@ bool PacketLoggerTask::loop(System &system) {
     csv_file.printf("%d" SEPARATOR "%s" SEPARATOR "%s" SEPARATOR "%s" SEPARATOR "%s" SEPARATOR "%s" SEPARATOR "%.1f" SEPARATOR "%.1f" SEPARATOR "%.1f\n", counter, line.timestamp, line.callsign, line.target, line.path, line.data, line.RSSI, line.SNR, line.freq_error);
     log_queue.pop();
     counter++;
+    total_count++;
   }
 
+  _stateInfo = "Logged " + String(total_count) + " packets since the device started";
   csv_file.close();
 
   return true;

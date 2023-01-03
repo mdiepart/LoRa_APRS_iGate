@@ -33,10 +33,11 @@ private:
   void   rotate(System &system);
   String filename;
 
-  bool   enabled;
-  size_t nb_lines;
-  size_t nb_files;
-  size_t counter;
+  bool         enabled;
+  size_t       nb_lines;
+  size_t       nb_files;
+  size_t       counter;
+  unsigned int total_count;
 
   // const char          *SEPARATOR  = ";";
   const String         HEADER     = String("NUMBER" SEPARATOR "TIMESTAMP" SEPARATOR "CALLSIGN" SEPARATOR "TARGET" SEPARATOR "PATH" SEPARATOR "DATA" SEPARATOR "RSSI" SEPARATOR "SNR" SEPARATOR "FREQ_ERROR");
