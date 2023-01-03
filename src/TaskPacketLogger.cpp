@@ -105,7 +105,7 @@ bool PacketLoggerTask::loop(System &system) {
     return true;
   }
 
-  if (counter >= nb_files) {
+  if (counter >= nb_lines) {
     rotate(system);
     counter = 0;
   }
