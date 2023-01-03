@@ -3,6 +3,7 @@
 
 #include <FS.h>
 #include <TaskManager.h>
+#include <WiFiMulti.h>
 #include <queue>
 #include <stdio.h>
 
@@ -14,9 +15,11 @@ public:
   PacketLoggerTask(String filename);
   virtual ~PacketLoggerTask();
 
-  bool setup(System &system) override;
-  bool loop(System &system) override;
-  void logPacket(const String &callsign, const String &target, const String &path, const String &data, float RSSI, float SNR, float frequency_error);
+  bool   setup(System &system) override;
+  bool   loop(System &system) override;
+  void   logPacket(const String &callsign, const String &target, const String &path, const String &data, float RSSI, float SNR, float frequency_error);
+  String getExtract(unsigned int length);
+  bool   getFullLogs(WiFiClient &client);
 
 private:
   typedef struct {

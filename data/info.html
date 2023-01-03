@@ -13,6 +13,7 @@
     <div class="sidebar">
         <a href="#HOME"><i class="fa fa-fw fa-home"></i> Home</a>
         <a href="#STATUS"><i class="fas fa-comment-alt"></i> Status</a>
+        <a href="#LOGS"><i class="fa fa-fw fa-book"></i> Logs</a>
         <a href="#OTA"><i class="fa fa-fw fa-wifi"></i> Enable OTA</a>
         <a href="#FIRMWARE"><i class="fa fa-fw fa-wrench"></i> Update Firmware</a>
     </div>
@@ -30,6 +31,17 @@
             <div class="title"><span>Status:</span></div>
             <p><br></p>
             $$TASKLIST$$
+            <p><br></p>
+        </div>
+        <div class="container wrapper LOGS" id="LOGS">
+            <p><br></p>
+            <div class="title"><span>Logs</span></div>
+            <p><br></p>
+            $$LOGSLIST$$
+            <p><br></p>
+            <a href="/packets.log" style="display: flex; align-items: center; justify-content: center;" class="row" download>
+                <i class="fa fa-fw fa-download"></i> Download logs
+            </a>
             <p><br></p>
         </div>
         <div class="container wrapper OTA" id="OTA">

@@ -1,6 +1,7 @@
 #include <FS.h>
 #include <SPIFFS.h>
 #include <TimeLib.h>
+#include <WiFiMulti.h>
 #include <queue>
 #include <string>
 
@@ -209,4 +210,62 @@ void PacketLoggerTask::rotate(System &system) {
   File csv_file = SPIFFS.open(origin_file, "w", true);
   csv_file.println(HEADER);
   csv_file.close();
+}
+
+String PacketLoggerTask::getExtract(unsigned int length) {
+  String output = "";
+
+  File csv_file = SPIFFS.open("/" + filename, "r");
+  if (!csv_file) {
+    return "Error opening logs file...";
+  }
+
+  length = min<uint>(length, nb_lines);
+
+  csv_file.seek(0, SeekSet);
+  csv_file.readStringUntil('\n'); // Discard header
+  while ((length > 0) && (csv_file.position() < csv_file.size())) {
+    output += csv_file.readStringUntil('\n') + "\n";
+    length--;
+  }
+
+  csv_file.close();
+  return output;
+}
+
+bool PacketLoggerTask::getFullLogs(WiFiClient &client) {
+  client.println(HEADER);
+  size_t counter = 0;
+  File   csv_file;
+  String log_line;
+  char   file[32];
+
+  for (int i = nb_files - 1; i >= 0; i--) {
+    snprintf(file, 31, "/%s.%d", filename.c_str(), i);
+    csv_file = SPIFFS.open(file, "r");
+    if (csv_file) {
+      csv_file.readStringUntil('\n');
+      while (csv_file.position() < csv_file.size()) {
+        csv_file.readStringUntil('\t');
+        log_line = csv_file.readStringUntil('\n');
+        client.printf("%d\t%s\n", counter++, log_line.c_str());
+      }
+      csv_file.close();
+    }
+  }
+
+  // Read from current file
+  csv_file = SPIFFS.open("/" + filename, "r");
+  if (!csv_file) {
+    return false;
+  }
+  csv_file.readStringUntil('\n'); // Discard header
+  while (csv_file.position() < csv_file.size()) {
+    csv_file.readStringUntil('\t');
+    log_line = csv_file.readStringUntil('\n');
+    client.printf("%d\t%s\n", counter++, log_line.c_str());
+  }
+  csv_file.close();
+
+  return true;
 }

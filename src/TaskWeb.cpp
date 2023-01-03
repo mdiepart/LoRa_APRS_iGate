@@ -43,6 +43,9 @@ bool WebTask::setup(System &system) {
 
     auto fn_uploadFW = std::bind(std::mem_fn(&WebTask::uploadfw_page), this, _1, _2, _3);
     Webserver.addTarget(webserver::POST, "/uploadFW", fn_uploadFW); // /uploadFW; auth
+
+    auto fn_packet_logs = std::bind(std::mem_fn(&WebTask::download_packets_logs), this, _1, _2, _3);
+    Webserver.addTarget(webserver::GET, "/packets.log", fn_packet_logs); // /packets.log; auth
   }
 
   system.log_info(getName(), "Web server started.");
@@ -197,12 +200,24 @@ void WebTask::info_page(WiFiClient &client, webserver::Header_t &header, System 
       tasklist += task->getName() + ": " + task->getStateInfo() + "</p>";
     }
   }
-
   page.replace("$$TASKLIST$$", tasklist);
+
+  String logs = system.getPacketLogger()->getExtract(10);
+  sanitize(logs);
+  logs = "<tt>" + logs + "</tt>";
+  page.replace("$$LOGSLIST$$", logs);
 
   page.trim();
   client.println(page);
   client.println();
+}
+
+void WebTask::download_packets_logs(WiFiClient &client, webserver::Header_t &header, System &system) {
+  if (!isClientLoggedIn(client, header)) {
+    client.println(STATUS_303_LOGIN);
+    return;
+  }
+  system.getPacketLogger()->getFullLogs(client);
 }
 
 void WebTask::enableota_page(WiFiClient &client, webserver::Header_t &header, System &system) {
@@ -600,4 +615,14 @@ String WebTask::STATUS_200(WiFiClient &client, const webserver::Header_t &header
   } else {
     return response;
   }
+}
+
+void WebTask::sanitize(String &string) {
+  string.replace("<", "&lt;");
+  string.replace(">", "&gt;");
+  string.replace("&", "&amp;");
+  string.replace("\"", "&quot;");
+  string.replace("'", "&apos;");
+  string.replace("\n", "<br>");
+  string.replace("\t", "&emsp;");
 }

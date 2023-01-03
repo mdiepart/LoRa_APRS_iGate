@@ -44,6 +44,7 @@ private:
   bool   isClientLoggedIn(const WiFiClient &client, const webserver::Header_t &header) const;
   String getSessionCookie(const webserver::Header_t &header) const;
   String STATUS_200(WiFiClient &client, const webserver::Header_t &header);
+  void   sanitize(String &string);
 
   void info_page(WiFiClient &client, webserver::Header_t &header, System &system);
   void enableota_page(WiFiClient &client, webserver::Header_t &header, System &system);
@@ -51,6 +52,7 @@ private:
   void login_page(WiFiClient &client, webserver::Header_t &header, System &system);
   void style_css(WiFiClient &client, webserver::Header_t &header, System &system);
   void root_redirect(WiFiClient &client, webserver::Header_t &header, System &system);
+  void download_packets_logs(WiFiClient &client, webserver::Header_t &header, System &system);
 };
 
 /*class webTarget {
