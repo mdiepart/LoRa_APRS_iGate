@@ -11,18 +11,23 @@
 #include "project_configuration.h"
 
 PacketLoggerTask::PacketLoggerTask(String filename) : Task(TASK_PACKET_LOGGER, TaskPacketLogger) {
-  this->filename = filename;
-  enabled        = true;
-  log_queue      = std::queue<log_line>();
-  total_count    = 0;
+  this->filename   = filename;
+  enabled          = true;
+  log_queue        = std::queue<log_line>();
+  total_count      = 0;
+  curr_tail_length = 0;
 }
 
 PacketLoggerTask::~PacketLoggerTask() {
 }
 
 bool PacketLoggerTask::setup(System &system) {
-  this->nb_lines = system.getUserConfig()->packetLogger.nb_lines;
-  this->nb_files = system.getUserConfig()->packetLogger.nb_files;
+  this->nb_lines        = system.getUserConfig()->packetLogger.nb_lines;
+  this->nb_files        = system.getUserConfig()->packetLogger.nb_files;
+  this->max_tail_length = system.getUserConfig()->packetLogger.tail_length;
+  if (this->max_tail_length > this->nb_lines) {
+    this->max_tail_length = nb_lines;
+  }
   if (!system.getUserConfig()->packetLogger.active || filename == "" || nb_lines == 0) {
     logger.debug(getName(), "Disabled packet logger.");
     enabled = false;
@@ -114,6 +119,9 @@ bool PacketLoggerTask::setup(System &system) {
       csv_file.close();
     }
   }
+
+  getTail(false);
+
   _stateInfo = "Running";
   return true;
 }
@@ -140,11 +148,20 @@ bool PacketLoggerTask::loop(System &system) {
   }
 
   while (!log_queue.empty() && csv_file) {
-    log_line line = log_queue.front();
-    csv_file.printf("%d" SEPARATOR "%s" SEPARATOR "%s" SEPARATOR "%s" SEPARATOR "%s" SEPARATOR "%s" SEPARATOR "%.1f" SEPARATOR "%.1f" SEPARATOR "%.1f\n", counter, line.timestamp, line.callsign, line.target, line.path, line.data, line.RSSI, line.SNR, line.freq_error);
+    log_line   line  = log_queue.front();
+    const char fmt[] = "%d" SEPARATOR "%s" SEPARATOR "%s" SEPARATOR "%s" SEPARATOR "%s" SEPARATOR "%s" SEPARATOR "%.1f" SEPARATOR "%.1f" SEPARATOR "%.1f\n";
+    csv_file.printf(fmt, counter, line.timestamp, line.callsign, line.target, line.path, line.data, line.RSSI, line.SNR, line.freq_error);
     log_queue.pop();
     counter++;
     total_count++;
+
+    if (curr_tail_length >= max_tail_length) {
+      tail = tail.substring(tail.indexOf("\n") + 1);
+    } else {
+      curr_tail_length++;
+    }
+    tail += String(counter) + SEPARATOR + line.timestamp + SEPARATOR + line.callsign + SEPARATOR + line.target + SEPARATOR + line.path;
+    tail += SEPARATOR + String(line.RSSI, 1) + SEPARATOR + String(line.SNR, 1) + SEPARATOR + String(line.freq_error, 1) + "\n";
   }
 
   _stateInfo = "Logged " + String(total_count) + " packets since the device started";
@@ -213,19 +230,21 @@ void PacketLoggerTask::rotate(System &system) {
   csv_file.close();
 }
 
-String PacketLoggerTask::getTail(unsigned int length) {
-  String output = "";
+String PacketLoggerTask::getTail(bool use_cache) {
+  if (use_cache == true && !tail.isEmpty()) {
+    return tail;
+  }
+
+  tail.clear();
 
   File csv_file = SPIFFS.open("/" + filename, "r");
   if (!csv_file) {
     return "Error opening logs file...";
   }
 
-  length = min<uint>(length, nb_lines);
-  length = min<uint>(length, counter);
-
+  unsigned int length = min<uint>(max_tail_length, counter);
+  unsigned int i      = length;
   csv_file.seek(-2, SeekEnd); // Rewind file to just before the last LF
-  unsigned int i = length;
   while (csv_file.position() > 0) {
     if (csv_file.peek() == '\n') {
       i--;
@@ -238,12 +257,14 @@ String PacketLoggerTask::getTail(unsigned int length) {
   csv_file.seek(1, SeekCur);
 
   while ((length > 0) && (csv_file.position() < csv_file.size())) {
-    output += csv_file.readStringUntil('\n') + "\n";
+    tail += csv_file.readStringUntil('\n') + "\n";
     length--;
+    curr_tail_length++;
   }
 
   csv_file.close();
-  return output;
+
+  return tail;
 }
 
 bool PacketLoggerTask::getFullLogs(WiFiClient &client) {

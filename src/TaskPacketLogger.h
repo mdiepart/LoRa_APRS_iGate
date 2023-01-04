@@ -18,7 +18,7 @@ public:
   bool   setup(System &system) override;
   bool   loop(System &system) override;
   void   logPacket(const String &callsign, const String &target, const String &path, const String &data, float RSSI, float SNR, float frequency_error);
-  String getTail(unsigned int length);
+  String getTail(bool use_cache = true);
   bool   getFullLogs(WiFiClient &client);
 
 private:
@@ -33,16 +33,17 @@ private:
     char  data[253];
   } log_line;
 
-  void   rotate(System &system);
-  String filename;
+  void rotate(System &system);
 
-  bool         enabled;
-  size_t       nb_lines;
-  size_t       nb_files;
-  size_t       counter;
-  unsigned int total_count;
-
-  // const char          *SEPARATOR  = ";";
+  bool                 enabled;
+  size_t               nb_lines;
+  size_t               nb_files;
+  size_t               counter;
+  size_t               max_tail_length;
+  size_t               curr_tail_length;
+  unsigned int         total_count;
+  String               filename;
+  String               tail;
   const String         HEADER     = String("NUMBER" SEPARATOR "TIMESTAMP" SEPARATOR "CALLSIGN" SEPARATOR "TARGET" SEPARATOR "PATH" SEPARATOR "DATA" SEPARATOR "RSSI" SEPARATOR "SNR" SEPARATOR "FREQ_ERROR");
   const size_t         QUEUE_SIZE = 5;
   std::queue<log_line> log_queue;

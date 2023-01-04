@@ -165,12 +165,13 @@ public:
 
   class PacketLogger {
   public:
-    PacketLogger() : active(true), nb_lines(100), nb_files(1) {
+    PacketLogger() : active(true), nb_lines(100), nb_files(1), tail_length(10) {
     }
 
     bool         active;
     unsigned int nb_lines;
     unsigned int nb_files;
+    unsigned int tail_length;
   };
 
   Configuration() : callsign("NOCALL-10"), ntpServer("pool.ntp.org"), board("") {

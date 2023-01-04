@@ -128,6 +128,8 @@ void ProjectConfigurationManagement::readProjectConfiguration(DynamicJsonDocumen
       conf.packetLogger.nb_lines = data["packet_logger"]["number_lines"] | 100;
     if (data["packet_logger"].containsKey("files_history"))
       conf.packetLogger.nb_files = data["packet_logger"]["files_history"] | 1;
+    if (data["packet_logger"].containsKey("tail_length"))
+      conf.packetLogger.tail_length = data["packet_logger"]["tail_length"] | 10;
   }
 
   if (data.containsKey("ntp_server"))
@@ -210,6 +212,7 @@ void ProjectConfigurationManagement::writeProjectConfiguration(Configuration &co
   data["packet_logger"]["active"]        = conf.packetLogger.active;
   data["packet_logger"]["number_lines"]  = conf.packetLogger.nb_lines;
   data["packet_logger"]["files_history"] = conf.packetLogger.nb_files;
+  data["packet_logger"]["tail_length"]   = conf.packetLogger.tail_length;
 
   data["ntp_server"] = conf.ntpServer;
 
