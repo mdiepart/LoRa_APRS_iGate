@@ -134,7 +134,7 @@ bool RadiolibTask::loop(System &system) {
       if (state == RADIOLIB_ERR_CRC_MISMATCH) {
         // Log an error
         logger.error(getName(), "[%s] Received corrupt packet (CRC check failed)", timeString().c_str());
-        system.getPacketLogger()->logPacket("", "", "", "CRC error", radio->getRSSI(), radio->getSNR(), radio->getFrequencyError());
+        system.getPacketLogger()->logPacket(" ", " ", " ", "CRC error", radio->getRSSI(), radio->getSNR(), radio->getFrequencyError()); // Fix the HTML responsible
       } else if (state != RADIOLIB_ERR_NONE) {
         logger.error(getName(), "[%s] readData failed, code %d", timeString().c_str(), state);
       } else {
@@ -150,7 +150,8 @@ bool RadiolibTask::loop(System &system) {
           breakTime(now(), tm);
           char timestamp[32];
           snprintf(timestamp, 31, "%04d-%02d-%02dT%02d:%02d:%02dZ", 1970 + tm.Year, tm.Month, tm.Day, tm.Hour, tm.Minute, tm.Second);
-          system.getPacketLogger()->logPacket(msg->getSource(), msg->getDestination(), msg->getPath(), msg->getBody()->getData(), radio->getRSSI(), radio->getSNR(), radio->getFrequencyError());
+          system.getPacketLogger()->logPacket(msg->getSource(), msg->getDestination(), msg->getPath()+" ", msg->getBody()->getData(), radio->getRSSI(), radio->getSNR(), radio->getFrequencyError());
+          // If getPath is empty, I added a space. Little space added in file and fix for HTML Logs view. (Otherwise, text would be overlapped easily)
         }
       }
       operationDone = false;
