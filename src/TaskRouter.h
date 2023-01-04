@@ -2,7 +2,6 @@
 #define TASK_ROUTER_H_
 
 #include <APRSMessage.h>
-#include <TaskMQTT.h>
 #include <TaskManager.h>
 
 class RouterTask : public Task {

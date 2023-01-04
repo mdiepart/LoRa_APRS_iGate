@@ -4,7 +4,6 @@
 #include <APRS-IS.h>
 #include <APRSMessage.h>
 #include <TaskManager.h>
-#include <Timer.h>
 
 class AprsIsTask : public Task {
 public:

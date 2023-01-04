@@ -1,10 +1,9 @@
+#include <ArduinoJson.h>
 #include <logger.h>
 
 #include "Task.h"
 #include "TaskMQTT.h"
 #include "project_configuration.h"
-
-#include <ArduinoJson.h>
 
 MQTTTask::MQTTTask(TaskQueue<std::shared_ptr<APRSMessage>> &toMQTT) : Task(TASK_MQTT, TaskMQTT), _toMQTT(toMQTT), _MQTT(_client) {
 }

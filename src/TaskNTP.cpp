@@ -1,6 +1,5 @@
-#include <logger.h>
-
 #include <TimeLib.h>
+#include <logger.h>
 
 #include "Task.h"
 #include "TaskNTP.h"
