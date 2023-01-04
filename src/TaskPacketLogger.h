@@ -28,7 +28,7 @@ private:
     float SNR;
     float freq_error;
     char  path[20];
-    char  callsign[7];
+    char  callsign[10];
     char  target[7];
     char  data[253];
   } log_line;

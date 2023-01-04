@@ -166,7 +166,7 @@ void PacketLoggerTask::logPacket(const String &callsign, const String &target, c
 
   log_line line = {0};
   strncpy(line.timestamp, timestamp, min<uint>(20, written));
-  strncpy(line.callsign, callsign.c_str(), min<uint>(6, callsign.length()));
+  strncpy(line.callsign, callsign.c_str(), min<uint>(9, callsign.length()));
   strncpy(line.target, target.c_str(), min<uint>(6, target.length()));
   strncpy(line.path, path.c_str(), min<uint>(19, path.length()));
   strncpy(line.data, data.c_str(), min<uint>(253, data.length()));
