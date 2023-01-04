@@ -7,12 +7,38 @@
     font-family: 'Poppins', sans-serif;
 }
 
+html {
+    scroll-behavior: smooth;
+}
+
 body {
     background: rgb(30, 33, 36);
 }
 
 ::selection {
     background: rgb(30, 33, 36);
+}
+
+/* width */
+::-webkit-scrollbar {
+    width: 20px;
+}
+
+/* Track */
+::-webkit-scrollbar-track {
+    box-shadow: inset 0 0 5px grey;
+    border-radius: 10px;
+}
+
+/* Handle */
+::-webkit-scrollbar-thumb {
+    background: #282b30;
+    border-radius: 10px;
+}
+
+/* Handle on hover */
+::-webkit-scrollbar-thumb:hover {
+    background: #36393e;
 }
 
 .container {
@@ -66,6 +92,22 @@ form .row input:focus {
     box-shadow: inset 0px 0px 2px 2px rgba(255, 255, 255);
 }
 
+.wrapper form .row a {
+    height: 100%;
+    width: 100%;
+    outline: none;
+    padding-left: 60px;
+    border-radius: 5px;
+    border: 1px solid lightgrey;
+    font-size: 16px;
+    transition: all 0.3s ease;
+}
+
+form .row a:focus {
+    border-color: #282b30;
+    box-shadow: inset 0px 0px 2px 2px rgba(255, 255, 255);
+}
+
 form .row input::placeholder {
     color: #999;
 }
@@ -106,6 +148,21 @@ form .row input::placeholder {
     background: #282b30;
     border: 1px solid #282b30;
     cursor: pointer;
+}
+
+.wrapper form .button a {
+    color: #fff;
+    font-size: 20px;
+    font-weight: 500;
+    padding-left: 0px;
+    background: #282b30;
+    border: 1px solid #282b30;
+    cursor: pointer;
+}
+
+form .button a:hover {
+    background: #fff;
+    color: #282b30;
 }
 
 form .button input:hover {
@@ -252,4 +309,109 @@ input[type="file"] {
     .sidebar a {
         font-size: 18px;
     }
+}
+
+/* th and td text must be white */
+th,
+td {
+    color: white;
+    padding: 5px;
+}
+
+/* make table scrollable */
+table {
+    display: block;
+    width: 100%;
+    overflow-x: auto;
+    white-space: nowrap;
+    border: 2px solid white;
+    border-radius: 5px;
+    padding: 5px;
+}
+
+/*
+	Max width before this PARTICULAR table gets nasty. This query will take effect for any screen smaller than 760px and also iPads specifically.
+	*/
+@media only screen and (max-width: 760px),
+(min-device-width: 768px) and (max-device-width: 1024px) {
+
+    /* Force table to not be like tables anymore */
+    table,
+    thead,
+    tbody,
+    th,
+    td,
+    tr {
+        display: block;
+    }
+
+    /* Hide table headers (but not display: none;, for accessibility) */
+    thead tr {
+        position: absolute;
+        top: -9999px;
+        left: -9999px;
+    }
+
+    tr {
+        margin: 0 0 1rem 0;
+    }
+
+    td {
+        /* Behave  like a "row" */
+        border: none;
+        position: relative;
+        padding-left: 140px;
+    }
+
+    td:before {
+        /* Now like a table header */
+        position: absolute;
+        /* Top/left values mimic padding */
+        top: 0;
+        left: 6px;
+        width: 45%;
+        padding-right: 10px;
+        white-space: nowrap;
+    }
+
+    /*
+		Label the data
+    You could also use a data-* attribute and content for this. That way "bloats" the HTML, this way means you need to keep HTML and CSS in sync. Lea Verou has a clever way to handle with text-shadow.
+		*/
+    td:nth-of-type(1):before {
+        content: "Number";
+    }
+
+    td:nth-of-type(2):before {
+        content: "Timestamp";
+    }
+
+    td:nth-of-type(3):before {
+        content: "Callsign";
+    }
+
+    td:nth-of-type(4):before {
+        content: "Target";
+    }
+
+    td:nth-of-type(5):before {
+        content: "Path";
+    }
+
+    td:nth-of-type(6):before {
+        content: "Data";
+    }
+
+    td:nth-of-type(7):before {
+        content: "RSSI (dBm)";
+    }
+
+    td:nth-of-type(8):before {
+        content: "SNR (db)";
+    }
+
+    td:nth-of-type(9):before {
+        content: "Freq Error (Hz)";
+    }
+
 }
