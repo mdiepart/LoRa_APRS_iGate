@@ -22,13 +22,13 @@ std::list<Task *> TaskManager::getTasks() {
 }
 
 bool TaskManager::setup(System &system) {
-  system.log_info(MODULE_NAME, "will setup all tasks...");
+  logger.info(MODULE_NAME, "will setup all tasks...");
   for (Task *elem : _alwaysRunTasks) {
-    system.log_debug(MODULE_NAME, "call setup for %s", elem->getName().c_str());
+    logger.debug(MODULE_NAME, "call setup for %s", elem->getName().c_str());
     elem->setup(system);
   }
   for (Task *elem : _tasks) {
-    system.log_debug(MODULE_NAME, "call setup for %s", elem->getName().c_str());
+    logger.debug(MODULE_NAME, "call setup for %s", elem->getName().c_str());
     elem->setup(system);
   }
   _nextTask = _tasks.begin();

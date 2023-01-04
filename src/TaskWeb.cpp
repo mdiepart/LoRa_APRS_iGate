@@ -48,7 +48,7 @@ bool WebTask::setup(System &system) {
     Webserver.addTarget(webserver::GET, "/packets.log", fn_packet_logs); // /packets.log; auth
   }
 
-  system.log_info(getName(), "Web server started.");
+  logger.info(getName(), "Web server started.");
   isServerStarted = true;
   return true;
 }
@@ -57,13 +57,13 @@ bool WebTask::loop(System &system) {
   if (isServerStarted && !system.isWifiOrEthConnected()) {
     http_server.close();
     isServerStarted = false;
-    system.log_warn(getName(), "Closed HTTP server because network connection was lost.");
+    logger.warn(getName(), "Closed HTTP server because network connection was lost.");
   }
 
   if (!isServerStarted && system.isWifiOrEthConnected()) {
     http_server.begin();
     isServerStarted = true;
-    system.log_warn(getName(), "Network connection recovered, http server restarted.");
+    logger.warn(getName(), "Network connection recovered, http server restarted.");
   }
 
   // Check for too old client sessions every 10s
@@ -85,7 +85,7 @@ bool WebTask::loop(System &system) {
 
   if (client) {
     client.setTimeout(TIMEOUT);
-    system.log_info(getName(), "new client with IP %s.", client.localIP().toString().c_str());
+    logger.info(getName(), "new client with IP %s.", client.localIP().toString().c_str());
 
     Webserver.serve(client, system);
 
@@ -234,7 +234,7 @@ void WebTask::enableota_page(WiFiClient &client, webserver::Header_t &header, Sy
   for (Task *it : system.getTaskManager().getTasks()) {
     if (it->getTaskId() == TaskOta) {
       ((OTATask *)it)->enableOTA(5 * 60 * 1000); // Enabling OTA for 5 minutes
-      system.log_info(getName(), "User enabled OTA for 5 minutes via web interface");
+      logger.info(getName(), "User enabled OTA for 5 minutes via web interface");
       page.replace("$$STATUS$$", "<p style=\"text-align: center; color: white;\">OTA Enabled for 5 minutes.</p>");
 
       break;
@@ -259,14 +259,14 @@ void WebTask::uploadfw_page(WiFiClient &client, webserver::Header_t &header, Sys
   webserver::Header_t::const_iterator it_content_type = header.find("Content-Type");
   if (it_content_type == header.cend()) {
     // This header does not describe data the way we expect it
-    system.log_debug(getName(), "No content type in header.");
+    logger.debug(getName(), "No content type in header.");
     client.println(STATUS_400);
     return;
   } else {
     // Fetch boundary token
     String content_type = it_content_type->second;
     boundary_token      = "--" + content_type.substring(content_type.indexOf(str_boundary) + str_boundary.length());
-    system.log_debug(getName(), "The boundary to compare with is %s.", boundary_token.c_str());
+    logger.debug(getName(), "The boundary to compare with is %s.", boundary_token.c_str());
   }
 
   // Finished parsing header. Now parsing form data
@@ -283,19 +283,19 @@ void WebTask::uploadfw_page(WiFiClient &client, webserver::Header_t &header, Sys
   // Read a line. It should be the first boundary of the form-data
   len                  = client.readBytesUntil('\n', read_buffer, BUFFER_LENGTH);
   read_buffer[len - 1] = '\0'; // Replace '\r' by '\0'
-  system.log_debug("uploadFW", "boundary token = %s, buffer = %s.", boundary_token.c_str(), read_buffer);
+  logger.debug("uploadFW", "boundary token = %s, buffer = %s.", boundary_token.c_str(), read_buffer);
   if (strcmp(boundary_token.c_str(), (const char *)read_buffer) == 0) { // We found a boundary token. It should be at the beginning of a form part
     while (client.available() && esp_error == ESP_OK) {
       String header = readCRLFCRLF(client); // Read the header that is just after the boundary
       // Determine field name
       name     = header.substring(header.indexOf("name=\"") + strlen("name=\""), header.indexOf("\"; filename"));
       filename = header.substring(header.indexOf("filename=\"") + strlen("filename=\""), header.indexOf("\"\r\n"));
-      system.log_debug(getName(), "Section with name=\"%s\" and filename = \"%s\".", name.c_str(), filename.c_str());
+      logger.debug(getName(), "Section with name=\"%s\" and filename = \"%s\".", name.c_str(), filename.c_str());
 
       if (name.equals("Firmware_File")) {
         // if no filename, we skip firmware upload
         if (filename.isEmpty()) {
-          system.log_debug(getName(), "No firmware file, skipping.");
+          logger.debug(getName(), "No firmware file, skipping.");
           continue;
         }
 
@@ -305,7 +305,7 @@ void WebTask::uploadfw_page(WiFiClient &client, webserver::Header_t &header, Sys
         esp_error                             = esp_ota_begin(next_part, OTA_SIZE_UNKNOWN, &ota_handle);
 
         if (esp_error != ESP_OK) {
-          system.log_warn(getName(), "Error starting OTA.");
+          logger.warn(getName(), "Error starting OTA.");
           break;
         }
 
@@ -317,7 +317,7 @@ void WebTask::uploadfw_page(WiFiClient &client, webserver::Header_t &header, Sys
           if (client.available()) {
             len = client.readBytesUntil('\n', read_buffer, BUFFER_LENGTH);
           } else {
-            system.log_debug(getName(), "No more bytes available.\n\n\n");
+            logger.debug(getName(), "No more bytes available.\n\n\n");
             break;
           }
 
@@ -351,7 +351,7 @@ void WebTask::uploadfw_page(WiFiClient &client, webserver::Header_t &header, Sys
             }
 
             if (len < 0) {
-              system.log_info(getName(), "len < 0");
+              logger.info(getName(), "len < 0");
             }
             esp_ota_write(ota_handle, data, len);
 
@@ -365,39 +365,39 @@ void WebTask::uploadfw_page(WiFiClient &client, webserver::Header_t &header, Sys
           }
         }
 
-        system.log_debug(getName(), "Finished parsing binary file. Size is %d", file_size);
+        logger.debug(getName(), "Finished parsing binary file. Size is %d", file_size);
 
         if (esp_error == ESP_OK) {
           esp_error = esp_ota_end(ota_handle);
         } else {
           // esp_ota_abort(ota_handle);
-          system.log_debug(getName(), "Error while writing to ota. Code is %d", esp_error);
+          logger.debug(getName(), "Error while writing to ota. Code is %d", esp_error);
         }
 
         switch (esp_error) {
         case ESP_OK:
-          system.log_debug(getName(), "OTA Succeeded.");
+          logger.debug(getName(), "OTA Succeeded.");
           esp_ota_set_boot_partition(next_part);
           break;
         case ESP_ERR_NOT_FOUND:
-          system.log_warn(getName(), "ESP_ERR_NOT_FOUND.");
+          logger.warn(getName(), "ESP_ERR_NOT_FOUND.");
           break;
         case ESP_ERR_INVALID_ARG:
-          system.log_warn(getName(), "ESP_ERR_INVALID_ARG.");
+          logger.warn(getName(), "ESP_ERR_INVALID_ARG.");
           break;
         case ESP_ERR_OTA_VALIDATE_FAILED:
-          system.log_warn(getName(), "ESP_ERR_OTA_VALIDATE_FAILED.");
+          logger.warn(getName(), "ESP_ERR_OTA_VALIDATE_FAILED.");
           break;
         case ESP_ERR_INVALID_STATE:
-          system.log_warn(getName(), "ESP_ERR_INVALID_STATE.");
+          logger.warn(getName(), "ESP_ERR_INVALID_STATE.");
           break;
         default:
-          system.log_warn(getName(), "ESP OTA unknown error...");
+          logger.warn(getName(), "ESP OTA unknown error...");
           break;
         }
       } else if (name.equals("SPIFFS_File")) {
         if (filename.isEmpty()) { // Do not update spiffs if we have no SPIFFS file
-          system.log_debug(getName(), "No SPIFFS file uploaded. Skipping.");
+          logger.debug(getName(), "No SPIFFS file uploaded. Skipping.");
           continue;
         }
 
@@ -409,7 +409,7 @@ void WebTask::uploadfw_page(WiFiClient &client, webserver::Header_t &header, Sys
 
         esp_error = esp_partition_erase_range(spiffs_part, 0, spiffs_part->size);
         if (esp_error != ESP_OK) {
-          system.log_warn(getName(), "Impossible to erase SPIFFS partition...");
+          logger.warn(getName(), "Impossible to erase SPIFFS partition...");
           break;
         }
 
@@ -461,7 +461,7 @@ void WebTask::uploadfw_page(WiFiClient &client, webserver::Header_t &header, Sys
         }
 
         if (esp_error != ESP_OK) {
-          system.log_warn(getName(), "Error while writing to spiffs partition.");
+          logger.warn(getName(), "Error while writing to spiffs partition.");
           break;
         }
       }
@@ -472,7 +472,7 @@ void WebTask::uploadfw_page(WiFiClient &client, webserver::Header_t &header, Sys
      }*/
   } else {
     // No token where one is expected
-    system.log_warn(getName(), "Could not find firmware data.");
+    logger.warn(getName(), "Could not find firmware data.");
 
     client.println(STATUS_400);
     return;
@@ -488,7 +488,7 @@ void WebTask::uploadfw_page(WiFiClient &client, webserver::Header_t &header, Sys
                  "</body></html>\r\n");
 
   if (esp_error == ESP_OK) {
-    system.log_warn(getName(), "ESP OTA succeeded. Restarting in 2s.");
+    logger.warn(getName(), "ESP OTA succeeded. Restarting in 2s.");
     client.stop();
     esp_restart();
   }

@@ -2,6 +2,7 @@
 #include <SPIFFS.h>
 #include <TimeLib.h>
 #include <WiFiMulti.h>
+#include <logger.h>
 #include <queue>
 #include <string>
 
@@ -23,7 +24,7 @@ bool PacketLoggerTask::setup(System &system) {
   this->nb_lines = system.getUserConfig()->packetLogger.nb_lines;
   this->nb_files = system.getUserConfig()->packetLogger.nb_files;
   if (!system.getUserConfig()->packetLogger.active || filename == "" || nb_lines == 0) {
-    system.log_debug(getName(), "Disabled packet logger.");
+    logger.debug(getName(), "Disabled packet logger.");
     enabled = false;
     if (system.getUserConfig()->packetLogger.active) {
       _state = Error;
@@ -34,23 +35,23 @@ bool PacketLoggerTask::setup(System &system) {
     return true;
   }
 
-  system.log_debug(getName(), "Setting up packetLogger. Filename is %s. Number of lines is %d. Number of history files is %d.", filename.c_str(), nb_lines, nb_files);
+  logger.debug(getName(), "Setting up packetLogger. Filename is %s. Number of lines is %d. Number of history files is %d.", filename.c_str(), nb_lines, nb_files);
   if (!SPIFFS.begin()) {
-    system.log_error(getName(), "Could not start SPIFFS...");
+    logger.error(getName(), "Could not start SPIFFS...");
     _state     = Error;
     _stateInfo = "Could not start SPIFFS";
     enabled    = false;
     return false;
   } else {
-    system.log_debug(getName(), "SPIFFS started.");
+    logger.debug(getName(), "SPIFFS started.");
   }
 
   File csv_file;
   if (!SPIFFS.exists("/" + filename)) {
-    system.log_debug(getName(), "CSV file did not exist. Creating it...");
+    logger.debug(getName(), "CSV file did not exist. Creating it...");
     csv_file = SPIFFS.open("/" + filename, "w", true);
     if (!csv_file) {
-      system.log_debug(getName(), "Could not create the file...");
+      logger.debug(getName(), "Could not create the file...");
       _state     = Error;
       _stateInfo = "Could not create log file";
       enabled    = false;
@@ -63,26 +64,26 @@ bool PacketLoggerTask::setup(System &system) {
   } else {
     csv_file = SPIFFS.open("/" + filename, "r");
     if (!csv_file) {
-      system.log_debug(getName(), "Could not open the csv file to read it.");
+      logger.debug(getName(), "Could not open the csv file to read it.");
     }
     if (csv_file.size() < HEADER.length()) {
-      system.log_debug(getName(), "File size is %d, which is less than header length. Recreating file.", csv_file.size());
+      logger.debug(getName(), "File size is %d, which is less than header length. Recreating file.", csv_file.size());
       counter = 0;
       csv_file.close();
       SPIFFS.remove("/" + filename);
       csv_file = SPIFFS.open("/" + filename, "w", true);
       if (!csv_file) {
-        system.log_error(getName(), "Could not re-open file after having removed it...");
+        logger.error(getName(), "Could not re-open file after having removed it...");
         _state     = Error;
         _stateInfo = "Could not create log file";
         enabled    = false;
         return false;
       } else {
-        system.log_debug(getName(), "File recreated successfully.");
+        logger.debug(getName(), "File recreated successfully.");
       }
       size_t written = csv_file.println(HEADER);
       csv_file.flush();
-      system.log_debug(getName(), "Written %d bytes to file.", written);
+      logger.debug(getName(), "Written %d bytes to file.", written);
       _stateInfo = "Running";
       return true;
     } else {
@@ -92,7 +93,7 @@ bool PacketLoggerTask::setup(System &system) {
         if (csv_file.position() > 0) {
           csv_file.seek(-1, SeekCur);
         } else {
-          system.log_debug(getName(), "Could not find a valid previous entry in the file. Recreating it.");
+          logger.debug(getName(), "Could not find a valid previous entry in the file. Recreating it.");
           csv_file.close();
           SPIFFS.remove("/" + filename);
           csv_file = SPIFFS.open("/" + filename, "w", true);
@@ -104,12 +105,12 @@ bool PacketLoggerTask::setup(System &system) {
       }
       csv_file.seek(1, SeekCur);
       // Read the number, store it to counter
-      system.log_debug(getName(), "Reading previous number from position %d.", csv_file.position());
+      logger.debug(getName(), "Reading previous number from position %d.", csv_file.position());
       String prev_number = csv_file.readStringUntil(SEPARATOR[0]);
-      system.log_debug(getName(), "prev_number is \"%s\"", prev_number.c_str());
+      logger.debug(getName(), "prev_number is \"%s\"", prev_number.c_str());
       long int n = prev_number.toInt();
       counter    = (n < SIZE_MAX) ? n + 1 : SIZE_MAX;
-      system.log_debug(getName(), "Found a valid previous entry in packets logs. Counter initialized to %d.", counter);
+      logger.debug(getName(), "Found a valid previous entry in packets logs. Counter initialized to %d.", counter);
       csv_file.close();
     }
   }
@@ -131,7 +132,7 @@ bool PacketLoggerTask::loop(System &system) {
   if (!log_queue.empty()) {
     csv_file = SPIFFS.open("/" + filename, "a");
     if (!csv_file) {
-      system.log_error(getName(), "Could not open csv file to log packets...");
+      logger.error(getName(), "Could not open csv file to log packets...");
       return false;
     }
   } else {
@@ -187,10 +188,10 @@ void PacketLoggerTask::rotate(System &system) {
   snprintf(origin_file, 32, "/%s.%d", filename.c_str(), nb_files - 1);
 
   if (SPIFFS.remove(origin_file) == ESP_OK) {
-    system.log_debug(getName(), "Deleted file %s.", origin_file);
+    logger.debug(getName(), "Deleted file %s.", origin_file);
   } else {
     // File might not exist, in this case, remove will return ESP_ERR_NVS_NOT_FOUND
-    system.log_debug(getName(), "Could not delete file %s.", origin_file);
+    logger.debug(getName(), "Could not delete file %s.", origin_file);
   }
 
   for (int i = nb_files - 1; i > 0; i--) {
@@ -198,7 +199,7 @@ void PacketLoggerTask::rotate(System &system) {
     snprintf(target_file, 32, "/%s.%d", filename.c_str(), i);
     if (SPIFFS.exists(origin_file)) {
       SPIFFS.rename(origin_file, target_file);
-      system.log_debug(getName(), "Moved file %s to %s.", origin_file, target_file);
+      logger.debug(getName(), "Moved file %s to %s.", origin_file, target_file);
     }
   }
 

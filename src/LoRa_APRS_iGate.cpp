@@ -56,21 +56,19 @@ void setup() {
   esp_task_wdt_init(10, true);
   esp_task_wdt_add(NULL);
   Serial.begin(115200);
-  LoRaSystem.getLogger().setSerial(&Serial);
-  setWiFiLogger(&LoRaSystem.getLogger());
   delay(500);
-  LoRaSystem.log_info(MODULE_NAME, "LoRa APRS iGate by OE5BPA (Peter Buchegger)");
-  LoRaSystem.log_info(MODULE_NAME, "Version: %s", VERSION);
+  logger.info(MODULE_NAME, "LoRa APRS iGate by OE5BPA (Peter Buchegger)");
+  logger.info(MODULE_NAME, "Version: %s", VERSION);
 
   switch (esp_reset_reason()) {
   case ESP_RST_TASK_WDT:
-    LoRaSystem.log_debug(MODULE_NAME, "Module reset because of watchdog timer.");
+    logger.debug(MODULE_NAME, "Module reset because of watchdog timer.");
     break;
   case ESP_RST_SW:
-    LoRaSystem.log_debug(MODULE_NAME, "Module reset following software call.");
+    logger.debug(MODULE_NAME, "Module reset following software call.");
     break;
   default:
-    LoRaSystem.log_debug(MODULE_NAME, "Module reset for reason %d.", (int)esp_reset_reason());
+    logger.debug(MODULE_NAME, "Module reset for reason %d.", (int)esp_reset_reason());
     break;
   }
 
@@ -86,34 +84,34 @@ void setup() {
   boardConfigs.push_back(&GUALTHERIUS_LORAHAM_v100);
   boardConfigs.push_back(&GUALTHERIUS_LORAHAM_v106);
 
-  ProjectConfigurationManagement confmg(LoRaSystem.getLogger());
-  confmg.readConfiguration(LoRaSystem.getLogger(), userConfig);
+  ProjectConfigurationManagement confmg;
+  confmg.readConfiguration(userConfig);
 
   BoardFinder        finder(boardConfigs);
   BoardConfig const *boardConfig = finder.getBoardConfig(userConfig.board);
   if (!boardConfig) {
-    boardConfig = finder.searchBoardConfig(LoRaSystem.getLogger());
+    boardConfig = finder.searchBoardConfig();
     if (!boardConfig) {
-      LoRaSystem.log_error(MODULE_NAME, "Board config not set and search failed!");
+      logger.error(MODULE_NAME, "Board config not set and search failed!");
       while (true)
         ;
     } else {
       userConfig.board = boardConfig->Name;
-      confmg.writeConfiguration(LoRaSystem.getLogger(), userConfig);
-      LoRaSystem.log_info(MODULE_NAME, "will restart board now!");
+      confmg.writeConfiguration(userConfig);
+      logger.info(MODULE_NAME, "will restart board now!");
       ESP.restart();
     }
   }
 
-  LoRaSystem.log_info(MODULE_NAME, "Board %s loaded.", boardConfig->Name.c_str());
+  logger.info(MODULE_NAME, "Board %s loaded.", boardConfig->Name.c_str());
 
   if (boardConfig->Type == eTTGO_T_Beam_V1_0) {
     Wire.begin(boardConfig->OledSda, boardConfig->OledScl);
     PowerManagement powerManagement;
     if (!powerManagement.begin(Wire)) {
-      LoRaSystem.log_info(MODULE_NAME, "AXP192 init done!");
+      logger.info(MODULE_NAME, "AXP192 init done!");
     } else {
-      LoRaSystem.log_error(MODULE_NAME, "AXP192 init failed!");
+      logger.error(MODULE_NAME, "AXP192 init failed!");
     }
     powerManagement.activateLoRa();
     powerManagement.activateOLED();
@@ -171,13 +169,13 @@ void setup() {
   LoRaSystem.getDisplay().showSpashScreen("LoRa APRS iGate", VERSION);
 
   if (userConfig.callsign == "NOCALL-10") {
-    LoRaSystem.log_error(MODULE_NAME, "You have to change your settings in 'data/is-cfg.json' and upload it via 'Upload File System image'!");
+    logger.error(MODULE_NAME, "You have to change your settings in 'data/is-cfg.json' and upload it via 'Upload File System image'!");
     LoRaSystem.getDisplay().showStatusScreen("ERROR", "You have to change your settings in 'data/is-cfg.json' and upload it via \"Upload File System image\"!");
     while (true)
       ;
   }
   if ((!userConfig.aprs_is.active) && !(userConfig.digi.active)) {
-    LoRaSystem.log_error(MODULE_NAME, "No mode selected (iGate or Digi)! You have to activate one of iGate or Digi.");
+    logger.error(MODULE_NAME, "No mode selected (iGate or Digi)! You have to activate one of iGate or Digi.");
     LoRaSystem.getDisplay().showStatusScreen("ERROR", "No mode selected (iGate or Digi)! You have to activate one of iGate or Digi.");
     while (true)
       ;
@@ -189,7 +187,7 @@ void setup() {
   }
 
   delay(5000);
-  LoRaSystem.log_info(MODULE_NAME, "setup done...");
+  logger.info(MODULE_NAME, "setup done...");
 }
 
 volatile bool syslogSet = false;
@@ -198,8 +196,8 @@ void loop() {
   esp_task_wdt_reset();
   LoRaSystem.getTaskManager().loop(LoRaSystem);
   if (LoRaSystem.isWifiOrEthConnected() && LoRaSystem.getUserConfig()->syslog.active && !syslogSet) {
-    LoRaSystem.getLogger().setSyslogServer(LoRaSystem.getUserConfig()->syslog.server, LoRaSystem.getUserConfig()->syslog.port, LoRaSystem.getUserConfig()->callsign);
-    LoRaSystem.log_info(MODULE_NAME, "System connected after a restart to the network, syslog server set");
+    logger.setSyslogServer(LoRaSystem.getUserConfig()->syslog.server, LoRaSystem.getUserConfig()->syslog.port, LoRaSystem.getUserConfig()->callsign);
+    logger.info(MODULE_NAME, "System connected after a restart to the network, syslog server set");
     syslogSet = true;
   }
 }

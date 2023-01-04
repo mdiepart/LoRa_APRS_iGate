@@ -11,12 +11,12 @@ BoardConfig::BoardConfig(String name, BoardType type, uint8_t oledsda, uint8_t o
 BoardFinder::BoardFinder(const std::list<BoardConfig const *> &boardConfigs) : _boardConfigs(boardConfigs) {
 }
 
-BoardConfig const *BoardFinder::searchBoardConfig(logging::Logger &logger) {
-  logger.log(logging::LoggerLevel::LOGGER_LEVEL_INFO, MODULE_NAME, "looking for a board config.");
-  logger.log(logging::LoggerLevel::LOGGER_LEVEL_INFO, MODULE_NAME, "searching for OLED...");
+BoardConfig const *BoardFinder::searchBoardConfig() {
+  logger.info(MODULE_NAME, "looking for a board config.");
+  logger.info(MODULE_NAME, "searching for OLED...");
 
   for (BoardConfig const *boardconf : _boardConfigs) {
-    if (boardconf->needCheckPowerChip && checkPowerConfig(boardconf, logger) == boardconf->powerCheckStatus) {
+    if (boardconf->needCheckPowerChip && checkPowerConfig(boardconf) == boardconf->powerCheckStatus) {
       PowerManagement powerManagement;
       Wire.begin(boardconf->OledSda, boardconf->OledScl);
       powerManagement.begin(Wire);
@@ -25,16 +25,16 @@ BoardConfig const *BoardFinder::searchBoardConfig(logging::Logger &logger) {
     } else if (boardconf->needCheckPowerChip) {
       continue;
     }
-    if (checkOledConfig(boardconf, logger)) {
-      logger.log(logging::LoggerLevel::LOGGER_LEVEL_INFO, MODULE_NAME, "found a board config: %s", boardconf->Name.c_str());
+    if (checkOledConfig(boardconf)) {
+      logger.info(MODULE_NAME, "found a board config: %s", boardconf->Name.c_str());
       return boardconf;
     }
   }
 
-  logger.log(logging::LoggerLevel::LOGGER_LEVEL_INFO, MODULE_NAME, "could not find OLED, will search for the modem now...");
+  logger.info(MODULE_NAME, "could not find OLED, will search for the modem now...");
 
   for (BoardConfig const *boardconf : _boardConfigs) {
-    if (boardconf->needCheckPowerChip && checkPowerConfig(boardconf, logger) == boardconf->powerCheckStatus) {
+    if (boardconf->needCheckPowerChip && checkPowerConfig(boardconf) == boardconf->powerCheckStatus) {
       PowerManagement powerManagement;
       Wire.begin(boardconf->OledSda, boardconf->OledScl);
       powerManagement.begin(Wire);
@@ -42,12 +42,12 @@ BoardConfig const *BoardFinder::searchBoardConfig(logging::Logger &logger) {
       Wire.end();
     }
     if (checkModemConfig(boardconf)) {
-      logger.log(logging::LoggerLevel::LOGGER_LEVEL_INFO, MODULE_NAME, "found a board config: %s", boardconf->Name.c_str());
+      logger.info(MODULE_NAME, "found a board config: %s", boardconf->Name.c_str());
       return boardconf;
     }
   }
 
-  logger.log(logging::LoggerLevel::LOGGER_LEVEL_ERROR, MODULE_NAME, "could not find a board config!");
+  logger.error(MODULE_NAME, "could not find a board config!");
 
   return 0;
 }
@@ -62,7 +62,7 @@ BoardConfig const *BoardFinder::getBoardConfig(String name) {
   return *elem;
 }
 
-bool BoardFinder::checkOledConfig(BoardConfig const *boardConfig, logging::Logger &logger) {
+bool BoardFinder::checkOledConfig(BoardConfig const *boardConfig) {
   if (boardConfig->OledReset > 0) {
     pinMode(boardConfig->OledReset, OUTPUT);
     digitalWrite(boardConfig->OledReset, HIGH);
@@ -72,7 +72,7 @@ bool BoardFinder::checkOledConfig(BoardConfig const *boardConfig, logging::Logge
     digitalWrite(boardConfig->OledReset, HIGH);
   }
   if (!Wire.begin(boardConfig->OledSda, boardConfig->OledScl)) {
-    logger.log(logging::LoggerLevel::LOGGER_LEVEL_WARN, MODULE_NAME, "issue with wire");
+    logger.warn(MODULE_NAME, "issue with wire");
     return false;
   }
   Wire.beginTransmission(boardConfig->OledAddr);
@@ -110,9 +110,9 @@ bool BoardFinder::checkModemConfig(BoardConfig const *boardConfig) {
   return false;
 }
 
-bool BoardFinder::checkPowerConfig(BoardConfig const *boardConfig, logging::Logger &logger) {
+bool BoardFinder::checkPowerConfig(BoardConfig const *boardConfig) {
   if (!Wire.begin(boardConfig->OledSda, boardConfig->OledScl)) {
-    logger.log(logging::LoggerLevel::LOGGER_LEVEL_WARN, MODULE_NAME, "issue with wire");
+    logger.warn(MODULE_NAME, "issue with wire");
     return false;
   }
   Wire.beginTransmission(0x34);
@@ -125,12 +125,12 @@ bool BoardFinder::checkPowerConfig(BoardConfig const *boardConfig, logging::Logg
 
   Wire.end();
 
-  logger.log(logging::LoggerLevel::LOGGER_LEVEL_DEBUG, MODULE_NAME, "wire response: %d", response);
+  logger.debug(MODULE_NAME, "wire response: %d", response);
   if (response == 0x03) {
-    logger.log(logging::LoggerLevel::LOGGER_LEVEL_DEBUG, MODULE_NAME, "power chip found!");
+    logger.debug(MODULE_NAME, "power chip found!");
     return true;
   }
-  logger.log(logging::LoggerLevel::LOGGER_LEVEL_DEBUG, MODULE_NAME, "power chip NOT found");
+  logger.debug(MODULE_NAME, "power chip NOT found");
   return false;
 }
 

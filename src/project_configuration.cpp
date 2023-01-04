@@ -1,7 +1,5 @@
 #include <SPIFFS.h>
 
-#include <logger.h>
-
 #include "project_configuration.h"
 
 void ProjectConfigurationManagement::readProjectConfiguration(DynamicJsonDocument &data, Configuration &conf) {

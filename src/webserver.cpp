@@ -34,7 +34,7 @@ void webserver::serve(WiFiClient &client, System &system) {
   String start_line = client.readStringUntil('\n');
   start_line += '\n';
 
-  system.log_info(String("webServer"), "start line : %s", start_line.c_str());
+  logger.info(String("webServer"), "start line : %s", start_line.c_str());
 
   webTarget target(start_line);
 
@@ -72,7 +72,7 @@ void webserver::serve(WiFiClient &client, System &system) {
       return;
     }
   } else {
-    system.log_info(String("webServer"), "Found weird target, we should not be here...");
+    logger.info(String("webServer"), "Found weird target, we should not be here...");
 
     // Error 500
     client.println(STATUS_500);

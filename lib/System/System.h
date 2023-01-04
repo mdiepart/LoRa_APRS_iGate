@@ -27,14 +27,8 @@ public:
   bool                       isWifiOrEthConnected() const;
   void                       connectedViaEth(bool status);
   void                       connectedViaWifi(bool status);
-  logging::Logger           &getLogger();
   void                       setPacketLogger(PacketLoggerTask *task);
   PacketLoggerTask          *getPacketLogger();
-
-  void __attribute__((format(printf, 3, 4))) log_info(String name, const char *fmt, ...);
-  void __attribute__((format(printf, 3, 4))) log_debug(String name, const char *fmt, ...);
-  void __attribute__((format(printf, 3, 4))) log_error(String name, const char *fmt, ...);
-  void __attribute__((format(printf, 3, 4))) log_warn(String name, const char *fmt, ...);
 
 private:
   BoardConfig const   *_boardConfig;
@@ -43,7 +37,6 @@ private:
   Display              _display;
   bool                 _isEthConnected;
   bool                 _isWifiConnected;
-  logging::Logger      _logger;
   PacketLoggerTask    *_packetLogger;
 };
 

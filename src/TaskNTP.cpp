@@ -27,7 +27,7 @@ bool NTPTask::loop(System &system) {
   }
   if (_ntpClient.update()) {
     setTime(_ntpClient.getEpochTime());
-    system.log_info(getName(), "Current time: %s", _ntpClient.getFormattedTime().c_str());
+    logger.info(getName(), "Current time: %s", _ntpClient.getFormattedTime().c_str());
   }
   _stateInfo = _ntpClient.getFormattedTime();
   _state     = Okay;
