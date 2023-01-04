@@ -204,7 +204,8 @@ void WebTask::info_page(WiFiClient &client, webserver::Header_t &header, System 
 
   String logs = system.getPacketLogger()->getTail();
   sanitize(logs);
-  logs = "<tt>" + logs + "</tt>";
+  logs = "<td>" + logs + "</td>"; // Permit to format logs for a HTML table
+  logs.replace("</tr><tr><td></td>", ""); // Remove empty line
   page.replace("$$LOGSLIST$$", logs);
 
   page.trim();
@@ -623,6 +624,8 @@ void WebTask::sanitize(String &string) {
   string.replace("&", "&amp;");
   string.replace("\"", "&quot;");
   string.replace("'", "&apos;");
-  string.replace("\n", "<br>");
-  string.replace("\t", "&emsp;");
+  string.replace("\n", "</td></tr><tr><td>");
+  string.replace("\t", "</td><td>");
+  string.replace(" ", "&nbsp;");
 }
+
