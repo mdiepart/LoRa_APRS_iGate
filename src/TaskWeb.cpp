@@ -202,7 +202,7 @@ void WebTask::info_page(WiFiClient &client, webserver::Header_t &header, System 
   }
   page.replace("$$TASKLIST$$", tasklist);
 
-  String logs = system.getPacketLogger()->getExtract(10);
+  String logs = system.getPacketLogger()->getTail(10);
   sanitize(logs);
   logs = "<tt>" + logs + "</tt>";
   page.replace("$$LOGSLIST$$", logs);

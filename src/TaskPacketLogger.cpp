@@ -213,7 +213,7 @@ void PacketLoggerTask::rotate(System &system) {
   csv_file.close();
 }
 
-String PacketLoggerTask::getExtract(unsigned int length) {
+String PacketLoggerTask::getTail(unsigned int length) {
   String output = "";
 
   File csv_file = SPIFFS.open("/" + filename, "r");
@@ -222,9 +222,21 @@ String PacketLoggerTask::getExtract(unsigned int length) {
   }
 
   length = min<uint>(length, nb_lines);
+  length = min<uint>(length, counter);
 
-  csv_file.seek(0, SeekSet);
-  csv_file.readStringUntil('\n'); // Discard header
+  csv_file.seek(-2, SeekEnd); // Rewind file to just before the last LF
+  unsigned int i = length;
+  while (csv_file.position() > 0) {
+    if (csv_file.peek() == '\n') {
+      i--;
+    }
+    if (i == 0) {
+      break;
+    }
+    csv_file.seek(-1, SeekCur);
+  }
+  csv_file.seek(1, SeekCur);
+
   while ((length > 0) && (csv_file.position() < csv_file.size())) {
     output += csv_file.readStringUntil('\n') + "\n";
     length--;

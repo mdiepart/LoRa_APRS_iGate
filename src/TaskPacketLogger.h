@@ -18,7 +18,7 @@ public:
   bool   setup(System &system) override;
   bool   loop(System &system) override;
   void   logPacket(const String &callsign, const String &target, const String &path, const String &data, float RSSI, float SNR, float frequency_error);
-  String getExtract(unsigned int length);
+  String getTail(unsigned int length);
   bool   getFullLogs(WiFiClient &client);
 
 private:
