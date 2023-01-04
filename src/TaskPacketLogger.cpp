@@ -161,7 +161,7 @@ bool PacketLoggerTask::loop(System &system) {
       curr_tail_length++;
     }
     tail += String(counter) + SEPARATOR + line.timestamp + SEPARATOR + line.callsign + SEPARATOR + line.target + SEPARATOR + line.path;
-    tail += SEPARATOR + String(line.RSSI, 1) + SEPARATOR + String(line.SNR, 1) + SEPARATOR + String(line.freq_error, 1) + "\n";
+    tail += SEPARATOR + String(line.data) + SEPARATOR + String(line.RSSI, 1) + SEPARATOR + String(line.SNR, 1) + SEPARATOR + String(line.freq_error, 1) + "\n";
   }
 
   _stateInfo = "Logged " + String(total_count) + " packets since the device started";
