@@ -203,8 +203,9 @@ void WebTask::info_page(WiFiClient &client, webserver::Header_t &header, System 
   page.replace("$$TASKLIST$$", tasklist);
 
   String logs = system.getPacketLogger()->getTail();
-  sanitize(logs);
-  logs = "<td>" + logs + "</td>"; // Permit to format logs for a HTML table
+  logs        = "<td>" + sanitize(logs) + "</td>";
+  logs.replace("&#10;", "</td></tr><tr><td>");
+  logs.replace("&#9;", "</td><td>");
   logs.replace("</tr><tr><td></td>", ""); // Remove empty line
   page.replace("$$LOGSLIST$$", logs);
 
@@ -618,14 +619,36 @@ String WebTask::STATUS_200(WiFiClient &client, const webserver::Header_t &header
   }
 }
 
-void WebTask::sanitize(String &string) {
-  string.replace("<", "&lt;");
-  string.replace(">", "&gt;");
-  string.replace("&", "&amp;");
-  string.replace("\"", "&quot;");
-  string.replace("'", "&apos;");
-  string.replace("\n", "</td></tr><tr><td>");
-  string.replace("\t", "</td><td>");
-  string.replace(" ", "&nbsp;");
-}
+String WebTask::sanitize(const String &string) {
+  String output = "";
 
+  for (size_t i = 0; i < string.length(); i++) {
+    char c = string.charAt(i);
+
+    if (c < ' ') {
+      output += ("&#" + String((int)c) + ";");
+    } else {
+      switch (c) {
+      case '<':
+        output += "&lt;";
+        break;
+      case '>':
+        output += "&gt;";
+        break;
+      case '&':
+        output += "&amp;";
+        break;
+      case '"':
+        output += "&quot;";
+        break;
+      case '\'':
+        output += "&apos;";
+        break;
+      default:
+        output += c;
+      }
+    }
+  }
+
+  return output;
+}

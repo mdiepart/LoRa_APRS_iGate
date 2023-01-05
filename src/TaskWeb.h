@@ -44,7 +44,7 @@ private:
   bool   isClientLoggedIn(const WiFiClient &client, const webserver::Header_t &header) const;
   String getSessionCookie(const webserver::Header_t &header) const;
   String STATUS_200(WiFiClient &client, const webserver::Header_t &header);
-  void   sanitize(String &string);
+  String sanitize(const String &string);
 
   void info_page(WiFiClient &client, webserver::Header_t &header, System &system);
   void enableota_page(WiFiClient &client, webserver::Header_t &header, System &system);
