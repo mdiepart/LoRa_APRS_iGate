@@ -2,15 +2,16 @@
 
 ![Build check and build](https://github.com/lora-aprs/LoRa_APRS_iGate/workflows/Build%20check%20and%20build/badge.svg)
 
-The LoRa APRS iGate will work with very cheep hardware which you can buy from amazon, ebay or aliexpress.
+The LoRa APRS iGate will work with very cheap hardware which you can buy from amazon, ebay or aliexpress.
 Try it out and be part of the APRS network.
 
 ![TTGO LoRa32](pics/iGate.png)
 
 ## Blog posts and Youtube videos from other Hams
-
+* [ON4MOD - LoRa APRS : le guide pratique](https://on5vl.org/lora-aprs-le-guide-pratique/) (blog post - french) 06.12.2022
 * [Manuel Lausmann - iGate & Tracker](https://www.youtube.com/watch?v=-KdFQEaNC1k) (youtube - german) 04.06.2021
 * [Manuel Lausmann - Installationsanleitung als PDF](http://mala-one.de/Lora-APRS/) (PDF - german) 04.06.2021
+* [Thierry F4EWI - LoRa et LoRa APRS](http://www.f5kmy.fr/spip.php?article509) (blog post - french) 06.12.2020
 * [OE1ROT](https://www.aronaut.at/2020/11/lora-aprs-gateway-mit-esp32-boards/) (blog post - german) 14.11.2020
 * [DL7AG](http://online.dl7ag.de/lora-aprs-dl7ag-10/) (blog post - german) 08.11.2020
 * [Manuel Lausmann - iGate](https://www.youtube.com/watch?v=C7hfVe32pXs) (youtube - german - OLD) 06.11.2020
@@ -47,7 +48,8 @@ Keep in mind: you need a 433MHz version!
 
 **There is a german [quick start](https://www.lora-aprs.info/docs/LoRa_APRS_iGate/quick-start-guide/) page! Take a look ;)**
 
-**There is a french [quick start](http://www.f5kmy.fr/spip.php?article509) page! Take a look ;)**
+**There is a french [quick start](https://on5vl.org/lora-aprs-le-guide-pratique/) page! Take a look ;)**
+
 
 ### How to compile
 
@@ -60,7 +62,7 @@ The best success is to use PlatformIO (and it is the only platform where I can s
 
 ### Configuration
 
-* You can find all necessary settings to change for your configuration in **data/is-cfg.json**.
+* The settings to change for your configuration are located in **data/is-cfg.json**. [Here](./doc/is-cfg_json.md) is a detailed list of the parameters and their meaning.
 * To upload it to your board you have to do this via **Upload File System image** in PlatformIO!
 * To find the 'Upload File System image' click the PlatformIO symbol (the little alien) on the left side, choose your configuration, click on 'Platform' and search for 'Upload File System image'.
 
@@ -84,6 +86,24 @@ The versions are based on this settings:
 
 so the version will be: 20.46.0
 
+## Internal Web Server
+
+The internal webserver, if enabled in the configuration, allows you to update the module remotely and check the state of the various services.
+
+### Updating the igate via the web server
+
+The "Firmware Update" section of the web server allows you update the firmware and the SPIFFS partition of the module.
+
+To update the firmware, click on "Upload Firmware", select the `firmware.bin` file that PlatformIO generated (in the project folder, under `./.pio/build/lora_board/firmware.bin`). Then click "Upload".
+
+To update the SPIFFS filesystem, click on "Upload SPIFFS", select the `spiffs.bin` file that PlatformIO generated (in the project folder, under `./.pio/build/lora_board/spiffs.bin`). Then click "Upload".
+
+**Warning** As of now, trying to upload both files at the same time WILL NOT work. When updating the device, upload the SPIFFS file before the firmware file.
+
+## Packet logger
+
+A packet logger can be enabled in the configuration. It will store the latest packets received along with some more data (RSSI, SNR and frequency error of the reception). If a packet is recevived with incorrect data (an incorrect CRC check), a log line will be added with the RSSI, SNR and frequency_error of that transmission.
+
 ## Future plans
 
 * [x] show time until next beaconing
@@ -92,8 +112,8 @@ so the version will be: 20.46.0
 * [x] add support to turn OLED on, off and dimming
 * [ ] add support for temperature chips (BMExxx)
 * [x] add FTP server support to upload configuration
-* [ ] add web server for configuration and other things
-* [ ] add statistics for received packages
+* [x] add web server for configuration and other things
+* [x] add statistics for received packages
 * [ ] show received packages on a map
 * [ ] etc.
 
@@ -117,14 +137,4 @@ The [LoRa APRS WiKi Displays](https://github.com/lora-aprs/LoRa_APRS_Tracker/wik
 
 Feel free to add hints!
 
-## TODO
 
-### WebServer
-* Move the OTA and partition writing code out of the webserver part
-* improve request parsing 
-* Add ad-hoc config fields to json file
-* When uploading both SPIFFS and firmware, an error happens leaving the device with no valid SPIFFS.
-  * Use two spiffs and alternate between them when successfully completed ?
-* Some form of webserver should be started even if no SPIFFS partition exists so that the device can be recovered in case of error 
-* Check for rollback 
-* Explore possible image signature
