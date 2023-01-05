@@ -203,10 +203,13 @@ void WebTask::info_page(WiFiClient &client, webserver::Header_t &header, System 
   page.replace("$$TASKLIST$$", tasklist);
 
   String logs = system.getPacketLogger()->getTail();
-  logs        = "<td>" + sanitize(logs) + "</td>";
-  logs.replace("&#10;", "</td></tr><tr><td>");
-  logs.replace("&#9;", "</td><td>");
-  logs.replace("</tr><tr><td></td>", ""); // Remove empty line
+  logs.replace("\t\t", "\t \t");
+  logs = "<td>" + sanitize(logs) + "</td>";
+  logs.replace("&#10;", "</td></tr><tr><td>"); // Replace NL
+  logs.replace("&#9;", "</td><td>");           // Replace TAB
+  logs.replace("</tr><tr><td></td>", "");      // Remove empty line
+  logs.replace(" ", "&nbsp;");
+
   page.replace("$$LOGSLIST$$", logs);
 
   page.trim();
