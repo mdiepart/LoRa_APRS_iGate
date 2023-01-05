@@ -94,7 +94,8 @@
 	"packet_logger": {
 		"active": true,
 		"number_lines": 100,
-		"files_history": 9
+		"files_history": 9,
+		"tail_length": 10
 	},
 	"ntp_server": "pool.ntp.org"
 }
