@@ -34,7 +34,6 @@ public:
   uint8_t OledScl;
   uint8_t OledAddr;
   uint8_t OledReset;
-
   uint8_t LoraSck;
   uint8_t LoraMiso;
   uint8_t LoraMosi;
@@ -54,7 +53,6 @@ public:
   explicit BoardFinder(const std::list<BoardConfig const *> &boardConfigs);
 
   BoardConfig const *searchBoardConfig();
-
   BoardConfig const *getBoardConfig(String name);
 
 private:
