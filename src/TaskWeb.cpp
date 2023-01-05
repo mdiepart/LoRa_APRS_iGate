@@ -618,9 +618,10 @@ String WebTask::STATUS_200(WiFiClient &client, const webserver::Header_t &header
 }
 
 void WebTask::sanitize(String &string) {
+  string.replace("&", "&amp;");
   string.replace("<", "&lt;");
   string.replace(">", "&gt;");
-  string.replace("&", "&amp;");
+
   string.replace("\"", "&quot;");
   string.replace("'", "&apos;");
   string.replace("\n", "<br>");
