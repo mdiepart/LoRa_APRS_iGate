@@ -60,7 +60,7 @@ public:
 
   /**
    * This should be called in the main loop of your application. By default an update from the NTP Server is only
-   * made every 60 seconds. This can be configured in the NTPClient constructor.
+   * made every hour. This can be configured in the NTPClient constructor.
    *
    * @return true on success, false on failure
    */
@@ -84,7 +84,7 @@ public:
   void setTimeOffset(int timeOffset);
 
   /**
-   * Set the update interval to another frequency. E.g. useful when the
+   * Set the update interval (in ms). E.g. useful when the
    * timeOffset should not be set in the constructor
    */
   void setUpdateInterval(unsigned long updateInterval);
