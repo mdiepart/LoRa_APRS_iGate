@@ -200,6 +200,24 @@ void WebTask::info_page(WiFiClient &client, webserver::Header_t &header, System 
       tasklist += task->getName() + ": " + task->getStateInfo() + "</p>";
     }
   }
+
+  for (FreeRTOSTask *task : system.getTaskManager().getFreeRTOSTasks()) {
+    switch (task->getTaskId()) {
+    default:
+      switch (task->getState()) {
+      case TaskDisplayState::Okay:
+        tasklist += "<p class=\"task ok\">";
+        break;
+      case TaskDisplayState::Warning:
+        tasklist += "<p class=\"task warning\">";
+        break;
+      case TaskDisplayState::Error:
+        tasklist += "<p class=\"task error\">";
+        break;
+      }
+      tasklist += task->getName() + ": " + task->getStateInfo() + "</p>";
+    }
+  }
   page.replace("$$TASKLIST$$", tasklist);
 
   String logs = system.getPacketLogger()->getTail();

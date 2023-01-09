@@ -2,12 +2,12 @@
 #define TASK_MANAGER_H_
 
 #include <Arduino.h>
-#include <list>
-#include <memory>
-
 #include <BoardFinder.h>
 #include <Display.h>
 #include <configuration.h>
+#include <freertos/FreeRTOS.h>
+#include <list>
+#include <memory>
 
 #include "TaskQueue.h"
 
@@ -54,15 +54,62 @@ private:
   int    _taskId;
 };
 
+class FreeRTOSTask {
+public:
+  FreeRTOSTask(const String &name, int taskId, UBaseType_t priority, uint32_t stackDepth = configMINIMAL_STACK_SIZE, BaseType_t coreId = -1, int argc = 0, void *argv = NULL);
+  ~FreeRTOSTask();
+
+  xTaskHandle  handle;
+  virtual void worker(int argc, void *argv) = 0;
+  static void  taskWrap(void *param);
+
+  String getName() const {
+    return _name;
+  }
+
+  int getTaskId() const {
+    return _taskId;
+  }
+
+  TaskDisplayState getState() const {
+    return _state;
+  }
+
+  String getStateInfo() const {
+    return _stateInfo;
+  }
+
+protected:
+  TaskDisplayState _state;
+  String           _stateInfo;
+
+private:
+  String _name;
+  int    _taskId;
+  typedef struct fn_args {
+    fn_args(void *ptr) {
+      this->classPtr = ptr;
+      this->argc     = 0;
+      this->argv     = NULL;
+    }
+    void *classPtr;
+    int   argc = 0;
+    void *argv = NULL;
+  } fn_args;
+};
+
 class TaskManager {
 public:
   TaskManager();
   ~TaskManager() {
   }
 
-  void              addTask(Task *task);
-  void              addAlwaysRunTask(Task *task);
-  std::list<Task *> getTasks();
+  void addTask(Task *task);
+  void addAlwaysRunTask(Task *task);
+  void addFreeRTOSTask(FreeRTOSTask *task);
+
+  std::list<Task *>         getTasks();
+  std::list<FreeRTOSTask *> getFreeRTOSTasks();
 
   bool setup(System &system);
   bool loop(System &system);
@@ -71,6 +118,7 @@ private:
   std::list<Task *>           _tasks;
   std::list<Task *>::iterator _nextTask;
   std::list<Task *>           _alwaysRunTasks;
+  std::list<FreeRTOSTask *>   _FreeRTOSTasks;
 };
 
 class StatusFrame : public DisplayFrame {

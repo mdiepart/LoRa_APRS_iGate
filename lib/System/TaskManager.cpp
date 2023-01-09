@@ -15,10 +15,18 @@ void TaskManager::addAlwaysRunTask(Task *task) {
   _alwaysRunTasks.push_back(task);
 }
 
+void TaskManager::addFreeRTOSTask(FreeRTOSTask *task) {
+  _FreeRTOSTasks.push_back(task);
+}
+
 std::list<Task *> TaskManager::getTasks() {
   std::list<Task *> tasks = _alwaysRunTasks;
   std::copy(_tasks.begin(), _tasks.end(), std::back_inserter(tasks));
   return tasks;
+}
+
+std::list<FreeRTOSTask *> TaskManager::getFreeRTOSTasks() {
+  return _FreeRTOSTasks;
 }
 
 bool TaskManager::setup(System &system) {
@@ -70,4 +78,31 @@ void StatusFrame::drawStatusPage(Bitmap &bitmap) {
     }
     y += getSystemFont()->heightInPixel;
   }
+}
+
+FreeRTOSTask::FreeRTOSTask(const String &name, int taskId, UBaseType_t priority, uint32_t stackDepth, BaseType_t coreId, int argc, void *argv) : _state(Okay), _stateInfo("Booting"), _name(name), _taskId(taskId) {
+  fn_args *params = new fn_args(this);
+  params->argc    = argc;
+  params->argv    = argv;
+  xTaskCreateUniversal(taskWrap, getName().c_str(), stackDepth, params, priority, &handle, coreId);
+}
+
+FreeRTOSTask::~FreeRTOSTask() {
+#if INCLUDE_vTaskDelete
+  vTaskDelete(handle);
+#endif
+  return;
+}
+
+void FreeRTOSTask::taskWrap(void *param) {
+  fn_args *args = static_cast<fn_args *>(param);
+  static_cast<FreeRTOSTask *>(args->classPtr)->worker(args->argc, args->argv);
+  delete args;
+#if INCLUDE_vTaskDelete
+  vTaskDelete(static_cast<FreeRTOSTask *>(param)->handle);
+#else
+  while (1) {
+    vTaskDelay(10000);
+  }
+#endif
 }
