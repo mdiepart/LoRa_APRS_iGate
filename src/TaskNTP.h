@@ -4,17 +4,14 @@
 #include <NTPClient.h>
 #include <TaskManager.h>
 
-class NTPTask : public Task {
+class NTPTask : public FreeRTOSTask {
 public:
-  NTPTask();
-  virtual ~NTPTask();
+  NTPTask(UBaseType_t priority, BaseType_t coreId, int argc, void *argv);
 
-  virtual bool setup(System &system) override;
-  virtual bool loop(System &system) override;
+  void worker(int argc, void *argv) override;
 
 private:
   NTPClient _ntpClient;
-  bool      _beginCalled;
 };
 
 #endif

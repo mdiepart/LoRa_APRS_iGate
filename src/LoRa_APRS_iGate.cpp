@@ -43,7 +43,7 @@ RadiolibTask     modemTask(fromModem, toModem);
 EthTask          ethTask;
 WifiTask         wifiTask;
 OTATask          otaTask;
-NTPTask          ntpTask;
+NTPTask         *ntpTask;
 FTPTask          ftpTask;
 MQTTTask         mqttTask(toMQTT);
 WebTask          webTask;
@@ -142,7 +142,6 @@ void setup() {
 
   if (tcpip) {
     LoRaSystem.getTaskManager().addTask(&otaTask);
-    LoRaSystem.getTaskManager().addTask(&ntpTask);
     if (userConfig.ftp.active) {
       LoRaSystem.getTaskManager().addTask(&ftpTask);
     }
@@ -165,6 +164,11 @@ void setup() {
 
   esp_task_wdt_reset();
   LoRaSystem.getTaskManager().setup(LoRaSystem);
+
+  if (tcpip) {
+    ntpTask = new NTPTask(5, 0, 1, &LoRaSystem);
+    LoRaSystem.getTaskManager().addFreeRTOSTask(ntpTask);
+  }
 
   LoRaSystem.getDisplay().showSpashScreen("LoRa APRS iGate", VERSION);
 

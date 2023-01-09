@@ -5,30 +5,31 @@
 #include "TaskNTP.h"
 #include "project_configuration.h"
 
-NTPTask::NTPTask() : Task(TASK_NTP, TaskNtp), _beginCalled(false) {
+NTPTask::NTPTask(UBaseType_t priority, BaseType_t coreId, int argc, void *argv) : FreeRTOSTask(TASK_NTP, TaskNtp, priority, 1684, coreId, argc, argv) {
+  logger.debug(getName(), "NTP class created.");
 }
 
-NTPTask::~NTPTask() {
-}
-
-bool NTPTask::setup(System &system) {
-  _ntpClient.setPoolServerName(system.getUserConfig()->ntpServer.c_str());
-  return true;
-}
-
-bool NTPTask::loop(System &system) {
-  if (!system.isWifiOrEthConnected()) {
-    return false;
+void NTPTask::worker(int argc, void *argument) {
+  configASSERT(argc == 1);
+  System *system = static_cast<System *>(argument);
+  _ntpClient.setPoolServerName(system->getUserConfig()->ntpServer.c_str());
+  TickType_t previousWakeTime = xTaskGetTickCount();
+  TickType_t wakeInterval     = 3600000 * portTICK_PERIOD_MS; // Every hour
+  _ntpClient.begin();
+  logger.debug(getName(), "NTP Task initialized.");
+  for (;;) {
+    if (!system->isWifiOrEthConnected()) {
+      _state     = Warning;
+      _stateInfo = "Disconnected";
+      vTaskDelay(1000 * portTICK_PERIOD_MS);
+    } else if (_ntpClient.forceUpdate()) {
+      _state     = Okay;
+      _stateInfo = _ntpClient.getFormattedTime();
+      setTime(_ntpClient.getEpochTime());
+      logger.info(getName(), "Current time: %s", _ntpClient.getFormattedTime().c_str());
+      xTaskDelayUntil(&previousWakeTime, wakeInterval);
+    } else {
+      vTaskDelay(1000 * portTICK_PERIOD_MS);
+    }
   }
-  if (!_beginCalled) {
-    _ntpClient.begin();
-    _beginCalled = true;
-  }
-  if (_ntpClient.update()) {
-    setTime(_ntpClient.getEpochTime());
-    logger.info(getName(), "Current time: %s", _ntpClient.getFormattedTime().c_str());
-  }
-  _stateInfo = _ntpClient.getFormattedTime();
-  _state     = Okay;
-  return true;
 }
