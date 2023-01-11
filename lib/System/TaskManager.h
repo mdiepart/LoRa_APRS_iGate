@@ -61,7 +61,7 @@ public:
 
   xTaskHandle handle;
 
-  virtual void worker(int argc, void *argv) = 0;
+  virtual void worker() = 0;
 
   String getName() const {
     return _name;
@@ -79,7 +79,7 @@ public:
     return _stateInfo;
   }
 
-  bool start(int argc = 0, void *argv = NULL);
+  bool start();
 
 protected:
   TaskDisplayState _state;
@@ -93,11 +93,6 @@ private:
   UBaseType_t _priority;
   uint32_t    _stackDepth;
   BaseType_t  _coreId;
-  typedef struct fn_args_s {
-    void *classPtr = NULL;
-    int   argc     = 0;
-    void *argv     = NULL;
-  } fn_args;
 };
 
 class TaskManager {

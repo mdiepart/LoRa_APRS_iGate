@@ -2,15 +2,17 @@
 #define TASK_NTP_H_
 
 #include <NTPClient.h>
+#include <System.h>
 #include <TaskManager.h>
 
 class NTPTask : public FreeRTOSTask {
 public:
-  NTPTask(UBaseType_t priority, BaseType_t coreId, int argc, void *argv);
+  NTPTask(UBaseType_t priority, BaseType_t coreId, System &system);
 
-  void worker(int argc, void *argv) override;
+  void worker() override;
 
 private:
+  System   *_system;
   NTPClient _ntpClient;
 };
 

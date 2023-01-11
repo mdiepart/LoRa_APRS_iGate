@@ -6,21 +6,20 @@
 #include "TaskFTP.h"
 #include "project_configuration.h"
 
-FTPTask::FTPTask(UBaseType_t priority, BaseType_t coreId, int argc, void *argv) : FreeRTOSTask(TASK_FTP, TaskFtp, priority, 9216, coreId) {
+FTPTask::FTPTask(UBaseType_t priority, BaseType_t coreId, System &system) : FreeRTOSTask(TASK_FTP, TaskFtp, priority, 9216, coreId) {
   /* File buffer inside FTP server is 4096 bytes.*/
-  start(argc, argv);
+  _system = &system;
+  start();
 }
 
-void FTPTask::worker(int argc, void *argv) {
-  configASSERT(argc == 1);
-  System *system = static_cast<System *>(argv);
-  for (Configuration::Ftp::User user : system->getUserConfig()->ftp.users) {
+void FTPTask::worker() {
+  for (Configuration::Ftp::User user : _system->getUserConfig()->ftp.users) {
     logger.debug(getName(), "Adding user to FTP Server: %s", user.name.c_str());
     _ftpServer.addUser(user.name, user.password);
   }
   _ftpServer.addFilesystem("SPIFFS", &SPIFFS);
   _stateInfo = "waiting";
-  while (!system->isWifiOrEthConnected()) {
+  while (!_system->isWifiOrEthConnected()) {
     vTaskDelay(100 / portTICK_PERIOD_MS);
   }
   _ftpServer.begin();

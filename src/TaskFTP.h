@@ -6,11 +6,12 @@
 
 class FTPTask : public FreeRTOSTask {
 public:
-  FTPTask(UBaseType_t priority, BaseType_t coreId, int argc, void *argv);
+  FTPTask(UBaseType_t priority, BaseType_t coreId, System &system);
 
-  void worker(int argc, void *argv) override;
+  void worker() override;
 
 private:
+  System   *_system;
   FTPServer _ftpServer;
 };
 

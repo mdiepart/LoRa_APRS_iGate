@@ -6,11 +6,12 @@
 
 class WifiTask : public FreeRTOSTask {
 public:
-  WifiTask(UBaseType_t priority, BaseType_t coreId, int argc, void *argv);
+  WifiTask(UBaseType_t priority, BaseType_t coreId, System &system);
 
-  void worker(int argc, void *argv) override;
+  void worker() override;
 
 private:
+  System   *_system;
   WiFiMulti _wiFiMulti;
   uint8_t   _oldWifiStatus;
 };

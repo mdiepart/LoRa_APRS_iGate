@@ -1,3 +1,4 @@
+#include <System.h>
 #include <TimeLib.h>
 #include <logger.h>
 
@@ -5,21 +6,21 @@
 #include "TaskNTP.h"
 #include "project_configuration.h"
 
-NTPTask::NTPTask(UBaseType_t priority, BaseType_t coreId, int argc, void *argv) : FreeRTOSTask(TASK_NTP, TaskNtp, priority, 1684, coreId) {
+NTPTask::NTPTask(UBaseType_t priority, BaseType_t coreId, System &system) : FreeRTOSTask(TASK_NTP, TaskNtp, priority, 1684, coreId) {
+  _system = &system;
+  start();
   logger.debug(getName(), "NTP class created.");
-  start(argc, argv);
 }
 
-void NTPTask::worker(int argc, void *argument) {
-  configASSERT(argc == 1);
-  System *system = static_cast<System *>(argument);
-  _ntpClient.setPoolServerName(system->getUserConfig()->ntpServer.c_str());
+void NTPTask::worker() {
+
+  _ntpClient.setPoolServerName(_system->getUserConfig()->ntpServer.c_str());
   TickType_t previousWakeTime = xTaskGetTickCount();
   TickType_t wakeInterval     = 3600000 * portTICK_PERIOD_MS; // Every hour
   _ntpClient.begin();
   logger.debug(getName(), "NTP Task initialized.");
   for (;;) {
-    if (!system->isWifiOrEthConnected()) {
+    if (!_system->isWifiOrEthConnected()) {
       _state     = Warning;
       _stateInfo = "Disconnected";
       vTaskDelay(1000 * portTICK_PERIOD_MS);

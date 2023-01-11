@@ -91,9 +91,7 @@ FreeRTOSTask::~FreeRTOSTask() {
 }
 
 void FreeRTOSTask::taskWrap(void *param) {
-  fn_args *params = static_cast<fn_args *>(param);
-  static_cast<FreeRTOSTask *>(params->classPtr)->worker(params->argc, params->argv);
-  delete params;
+  static_cast<FreeRTOSTask *>(param)->worker();
 #if INCLUDE_vTaskDelete
   vTaskDelete(static_cast<FreeRTOSTask *>(param)->handle);
 #else
@@ -103,15 +101,11 @@ void FreeRTOSTask::taskWrap(void *param) {
 #endif
 }
 
-bool FreeRTOSTask::start(int argc, void *argv) {
+bool FreeRTOSTask::start() {
   if (taskStarted) {
     return false;
   } else {
-    fn_args *params  = new fn_args;
-    params->classPtr = this;
-    params->argc     = argc;
-    params->argv     = argv;
-    xTaskCreateUniversal(this->taskWrap, getName().c_str(), _stackDepth, params, _priority, &handle, _coreId);
+    xTaskCreateUniversal(this->taskWrap, getName().c_str(), _stackDepth, this, _priority, &handle, _coreId);
     return true;
   }
 }

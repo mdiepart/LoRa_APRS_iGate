@@ -156,7 +156,7 @@ void setup() {
   bool tcpip = false;
 
   if (userConfig.wifi.active) {
-    wifiTask = new WifiTask(6, 0, 1, &LoRaSystem);
+    wifiTask = new WifiTask(6, 0, LoRaSystem);
     LoRaSystem.getTaskManager().addFreeRTOSTask(wifiTask);
     tcpip = true;
   }
@@ -168,7 +168,7 @@ void setup() {
   if (tcpip) {
     LoRaSystem.getTaskManager().addTask(&otaTask);
     if (userConfig.ftp.active) {
-      ftpTask = new FTPTask(1, 1, 1, &LoRaSystem);
+      ftpTask = new FTPTask(1, 1, LoRaSystem);
       LoRaSystem.getTaskManager().addFreeRTOSTask(ftpTask);
     }
 
@@ -192,7 +192,7 @@ void setup() {
   LoRaSystem.getTaskManager().setup(LoRaSystem);
 
   if (tcpip) {
-    ntpTask = new NTPTask(5, 0, 1, &LoRaSystem);
+    ntpTask = new NTPTask(5, 0, LoRaSystem);
     LoRaSystem.getTaskManager().addFreeRTOSTask(ntpTask);
   }
 
