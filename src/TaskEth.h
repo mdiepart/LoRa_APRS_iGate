@@ -3,7 +3,7 @@
 
 #include <TaskManager.h>
 
-void WiFiEvent(WiFiEvent_t event);
+void NetworkEvent(WiFiEvent_t event);
 
 class EthTask : public Task {
 public:

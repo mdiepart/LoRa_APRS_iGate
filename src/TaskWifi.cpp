@@ -6,56 +6,50 @@
 #include "TaskWifi.h"
 #include "project_configuration.h"
 
-WifiTask::WifiTask() : Task(TASK_WIFI, TaskWifi), _oldWifiStatus(WL_IDLE_STATUS) {
+WifiTask::WifiTask(UBaseType_t priority, BaseType_t coreId, int argc, void *argv) : FreeRTOSTask(TASK_WIFI, TaskWifi, priority, 2048 + 4096, coreId) {
+  start(argc, argv);
 }
 
-WifiTask::~WifiTask() {
-}
-
-bool WifiTask::setup(System &system) {
-  // Don't save WiFi configuration in flash
+void WifiTask::worker(int argc, void *argv) {
+  configASSERT(argc == 1);
+  System *system = static_cast<System *>(argv);
   WiFi.persistent(false);
-
-  if (system.getUserConfig()->network.hostname.overwrite) {
-    WiFi.setHostname(system.getUserConfig()->network.hostname.name.c_str());
+  if (system->getUserConfig()->network.hostname.overwrite) {
+    WiFi.setHostname(system->getUserConfig()->network.hostname.name.c_str());
   } else {
-    WiFi.setHostname(system.getUserConfig()->callsign.c_str());
+    WiFi.setHostname(system->getUserConfig()->callsign.c_str());
   }
-
-  if (!system.getUserConfig()->network.DHCP) {
-    WiFi.config(system.getUserConfig()->network.static_.ip, system.getUserConfig()->network.static_.gateway, system.getUserConfig()->network.static_.subnet, system.getUserConfig()->network.static_.dns1, system.getUserConfig()->network.static_.dns2);
+  if (!system->getUserConfig()->network.DHCP) {
+    WiFi.config(system->getUserConfig()->network.static_.ip, system->getUserConfig()->network.static_.gateway, system->getUserConfig()->network.static_.subnet, system->getUserConfig()->network.static_.dns1, system->getUserConfig()->network.static_.dns2);
   }
 
   // Set WiFi to station mode
   WiFi.mode(WIFI_STA);
 
-  WiFi.onEvent(WiFiEvent);
+  WiFi.onEvent(NetworkEvent);
 
-  for (Configuration::Wifi::AP ap : system.getUserConfig()->wifi.APs) {
+  for (Configuration::Wifi::AP ap : system->getUserConfig()->wifi.APs) {
     logger.debug(getName(), "Looking for AP: %s", ap.SSID.c_str());
     _wiFiMulti.addAP(ap.SSID.c_str(), ap.password.c_str());
   }
-  return true;
-}
 
-bool WifiTask::loop(System &system) {
-  const uint8_t wifi_status = _wiFiMulti.run();
-  if (wifi_status != WL_CONNECTED) {
-    system.connectedViaWifi(false);
-    if (wifi_status != _oldWifiStatus) {
-      logger.error(getName(), "WiFi not connected!");
+  for (;;) {
+    uint8_t wifi_status = _wiFiMulti.run();
+    if (wifi_status == WL_CONNECTED) {
+      if (_oldWifiStatus != WL_CONNECTED) {
+        _oldWifiStatus = WL_CONNECTED;
+        system->connectedViaWifi(true);
+        _stateInfo = String("IP .") + String(WiFi.localIP()[3]) + String(" @ ") + String(WiFi.RSSI()) + String("dBm");
+      }
+      vTaskDelay(5000 / portTICK_PERIOD_MS);
+    } else {
+      if (_oldWifiStatus != wifi_status) {
+        _oldWifiStatus = wifi_status;
+        _state         = Error;
+        _stateInfo     = "Not connected";
+        system->connectedViaWifi(false);
+      }
+      vTaskDelay(1000 / portTICK_PERIOD_MS);
     }
-    _oldWifiStatus = wifi_status;
-    _stateInfo     = "WiFi not connected";
-    _state         = Error;
-    return false;
-  } else if (wifi_status != _oldWifiStatus) {
-    logger.debug(getName(), "WiFi IP address: %s", WiFi.localIP().toString().c_str());
-    _oldWifiStatus = wifi_status;
-    return false;
   }
-  system.connectedViaWifi(true);
-  _stateInfo = String("IP .") + String(WiFi.localIP()[3]) + String(" @ ") + String(WiFi.RSSI()) + String("dBm");
-  _state     = Okay;
-  return true;
 }

@@ -6,11 +6,11 @@
 #include "TaskEth.h"
 #include "project_configuration.h"
 
-#define WIFI_EVENT "WiFiEvent"
+#define WIFI_EVENT "NetworkEvent"
 
 volatile bool eth_connected = false;
 
-void WiFiEvent(WiFiEvent_t event) {
+void NetworkEvent(WiFiEvent_t event) {
   switch (event) {
   case SYSTEM_EVENT_STA_START:
     logger.info(WIFI_EVENT, "WiFi Started");
@@ -71,7 +71,7 @@ EthTask::~EthTask() {
 }
 
 bool EthTask::setup(System &system) {
-  WiFi.onEvent(WiFiEvent);
+  WiFi.onEvent(NetworkEvent);
 
   constexpr uint8_t          ETH_NRST      = 5;
   constexpr uint8_t          ETH_ADDR      = 0;

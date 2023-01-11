@@ -41,7 +41,7 @@ DisplayTask displayTask;
 // ModemTask   modemTask(fromModem, toModem);
 RadiolibTask     modemTask(fromModem, toModem);
 EthTask          ethTask;
-WifiTask         wifiTask;
+WifiTask        *wifiTask;
 OTATask          otaTask;
 NTPTask         *ntpTask;
 FTPTask          ftpTask;
@@ -132,7 +132,8 @@ void setup() {
   bool tcpip = false;
 
   if (userConfig.wifi.active) {
-    LoRaSystem.getTaskManager().addAlwaysRunTask(&wifiTask);
+    wifiTask = new WifiTask(6, 0, 1, &LoRaSystem);
+    LoRaSystem.getTaskManager().addFreeRTOSTask(wifiTask);
     tcpip = true;
   }
   if (boardConfig->Type == eETH_BOARD) {
