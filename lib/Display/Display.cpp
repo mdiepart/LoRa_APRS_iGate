@@ -26,7 +26,7 @@ void Display::setup(BoardConfig const *const boardConfig) {
   _displayFrameRate.setTimeout(500);
   _displayFrameRate.start();
 
-  _frameTimeout.setTimeout(15 * 1000);
+  _frameTimeout.setTimeout(2 * 1000);
   _displaySaveModeTimer.setTimeout(10 * 1000);
 }
 
