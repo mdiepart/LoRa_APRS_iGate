@@ -45,7 +45,7 @@ WifiTask        *wifiTask;
 OTATask          otaTask;
 NTPTask         *ntpTask;
 FTPTask         *ftpTask;
-MQTTTask         mqttTask(toMQTT);
+MQTTTask        *mqttTask;
 WebTask          webTask;
 AprsIsTask       aprsIsTask(toAprsIs);
 RouterTask       routerTask(fromModem, toModem, toAprsIs, toMQTT);
@@ -177,7 +177,8 @@ void setup() {
     }
 
     if (userConfig.mqtt.active) {
-      LoRaSystem.getTaskManager().addTask(&mqttTask);
+      mqttTask = new MQTTTask(4, 0, LoRaSystem, toMQTT);
+      LoRaSystem.getTaskManager().addFreeRTOSTask(mqttTask);
     }
 
     if (userConfig.web.active) {
