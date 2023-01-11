@@ -1,6 +1,6 @@
 # LoRa APRS iGate
 
-[![Integration Tests](https://github.com/lora-aprs/LoRa_APRS_iGate/actions/workflows/build_check.yml/badge.svg)](https://github.com/lora-aprs/LoRa_APRS_iGate/actions/workflows/build_check.yml)
+[![Integration Tests](https://github.com/mdiepart/LoRa_APRS_iGate/actions/workflows/build_check.yml/badge.svg)](https://github.com/mdiepart/LoRa_APRS_iGate/actions/workflows/build_check.yml)
 
 The LoRa APRS iGate will work with very cheep hardware which you can buy from amazon, ebay or aliexpress.
 Try it out and be part of the APRS network.
