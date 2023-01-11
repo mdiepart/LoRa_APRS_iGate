@@ -61,11 +61,35 @@ void setup() {
   logger.info(MODULE_NAME, "Version: %s", VERSION);
 
   switch (esp_reset_reason()) {
-  case ESP_RST_TASK_WDT:
-    logger.debug(MODULE_NAME, "Module reset because of watchdog timer.");
+  case ESP_RST_POWERON:
+    logger.debug(MODULE_NAME, "Module started.");
+    break;
+  case ESP_RST_EXT:
+    logger.debug(MODULE_NAME, "Module reset by external pin.");
     break;
   case ESP_RST_SW:
     logger.debug(MODULE_NAME, "Module reset following software call.");
+    break;
+  case ESP_RST_PANIC:
+    logger.debug(MODULE_NAME, "Module reset because of panic.");
+    break;
+  case ESP_RST_INT_WDT:
+    logger.debug(MODULE_NAME, "Module reset due to interrupt watchdog.");
+    break;
+  case ESP_RST_TASK_WDT:
+    logger.debug(MODULE_NAME, "Module reset because of task watchdog timer.");
+    break;
+  case ESP_RST_WDT:
+    logger.debug(MODULE_NAME, "Module reset due to other watchdogs.");
+    break;
+  case ESP_RST_DEEPSLEEP:
+    logger.debug(MODULE_NAME, "Module reset after exiting deepsleep.");
+    break;
+  case ESP_RST_BROWNOUT:
+    logger.debug(MODULE_NAME, "Module reset by brownout reset.");
+    break;
+  case ESP_RST_SDIO:
+    logger.debug(MODULE_NAME, "Module reset by SDIO.");
     break;
   default:
     logger.debug(MODULE_NAME, "Module reset for reason %d.", (int)esp_reset_reason());
