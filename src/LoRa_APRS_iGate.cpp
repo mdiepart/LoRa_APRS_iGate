@@ -44,7 +44,7 @@ EthTask          ethTask;
 WifiTask        *wifiTask;
 OTATask          otaTask;
 NTPTask         *ntpTask;
-FTPTask          ftpTask;
+FTPTask         *ftpTask;
 MQTTTask         mqttTask(toMQTT);
 WebTask          webTask;
 AprsIsTask       aprsIsTask(toAprsIs);
@@ -144,7 +144,8 @@ void setup() {
   if (tcpip) {
     LoRaSystem.getTaskManager().addTask(&otaTask);
     if (userConfig.ftp.active) {
-      LoRaSystem.getTaskManager().addTask(&ftpTask);
+      ftpTask = new FTPTask(1, 1, 1, &LoRaSystem);
+      LoRaSystem.getTaskManager().addFreeRTOSTask(ftpTask);
     }
 
     if (userConfig.aprs_is.active) {
