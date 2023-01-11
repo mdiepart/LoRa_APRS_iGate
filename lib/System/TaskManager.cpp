@@ -80,11 +80,7 @@ void StatusFrame::drawStatusPage(Bitmap &bitmap) {
   }
 }
 
-FreeRTOSTask::FreeRTOSTask(const String &name, int taskId, UBaseType_t priority, uint32_t stackDepth, BaseType_t coreId, int argc, void *argv) : _state(Okay), _stateInfo("Booting"), _name(name), _taskId(taskId) {
-  fn_args *params = new fn_args(this);
-  params->argc    = argc;
-  params->argv    = argv;
-  xTaskCreateUniversal(taskWrap, getName().c_str(), stackDepth, params, priority, &handle, coreId);
+FreeRTOSTask::FreeRTOSTask(const String &name, int taskId, UBaseType_t priority, uint32_t stackDepth, BaseType_t coreId) : _state(Okay), _stateInfo("Booting"), taskStarted(false), _name(name), _taskId(taskId), _priority(priority), _stackDepth(stackDepth), _coreId(coreId) {
 }
 
 FreeRTOSTask::~FreeRTOSTask() {
@@ -95,9 +91,9 @@ FreeRTOSTask::~FreeRTOSTask() {
 }
 
 void FreeRTOSTask::taskWrap(void *param) {
-  fn_args *args = static_cast<fn_args *>(param);
-  static_cast<FreeRTOSTask *>(args->classPtr)->worker(args->argc, args->argv);
-  delete args;
+  fn_args *params = static_cast<fn_args *>(param);
+  static_cast<FreeRTOSTask *>(params->classPtr)->worker(params->argc, params->argv);
+  delete params;
 #if INCLUDE_vTaskDelete
   vTaskDelete(static_cast<FreeRTOSTask *>(param)->handle);
 #else
@@ -105,4 +101,17 @@ void FreeRTOSTask::taskWrap(void *param) {
     vTaskDelay(10000);
   }
 #endif
+}
+
+bool FreeRTOSTask::start(int argc, void *argv) {
+  if (taskStarted) {
+    return false;
+  } else {
+    fn_args *params  = new fn_args;
+    params->classPtr = this;
+    params->argc     = argc;
+    params->argv     = argv;
+    xTaskCreateUniversal(this->taskWrap, getName().c_str(), _stackDepth, params, _priority, &handle, _coreId);
+    return true;
+  }
 }

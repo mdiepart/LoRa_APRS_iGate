@@ -5,8 +5,9 @@
 #include "TaskNTP.h"
 #include "project_configuration.h"
 
-NTPTask::NTPTask(UBaseType_t priority, BaseType_t coreId, int argc, void *argv) : FreeRTOSTask(TASK_NTP, TaskNtp, priority, 1684, coreId, argc, argv) {
+NTPTask::NTPTask(UBaseType_t priority, BaseType_t coreId, int argc, void *argv) : FreeRTOSTask(TASK_NTP, TaskNtp, priority, 1684, coreId) {
   logger.debug(getName(), "NTP class created.");
+  start(argc, argv);
 }
 
 void NTPTask::worker(int argc, void *argument) {

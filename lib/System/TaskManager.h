@@ -56,12 +56,12 @@ private:
 
 class FreeRTOSTask {
 public:
-  FreeRTOSTask(const String &name, int taskId, UBaseType_t priority, uint32_t stackDepth = configMINIMAL_STACK_SIZE, BaseType_t coreId = -1, int argc = 0, void *argv = NULL);
+  FreeRTOSTask(const String &name, int taskId, UBaseType_t priority, uint32_t stackDepth = configMINIMAL_STACK_SIZE, BaseType_t coreId = -1);
   ~FreeRTOSTask();
 
-  xTaskHandle  handle;
+  xTaskHandle handle;
+
   virtual void worker(int argc, void *argv) = 0;
-  static void  taskWrap(void *param);
 
   String getName() const {
     return _name;
@@ -79,22 +79,24 @@ public:
     return _stateInfo;
   }
 
+  bool start(int argc = 0, void *argv = NULL);
+
 protected:
   TaskDisplayState _state;
   String           _stateInfo;
+  static void      taskWrap(void *param);
+  bool             taskStarted;
 
 private:
-  String _name;
-  int    _taskId;
-  typedef struct fn_args {
-    fn_args(void *ptr) {
-      this->classPtr = ptr;
-      this->argc     = 0;
-      this->argv     = NULL;
-    }
-    void *classPtr;
-    int   argc = 0;
-    void *argv = NULL;
+  String      _name;
+  int         _taskId;
+  UBaseType_t _priority;
+  uint32_t    _stackDepth;
+  BaseType_t  _coreId;
+  typedef struct fn_args_s {
+    void *classPtr = NULL;
+    int   argc     = 0;
+    void *argv     = NULL;
   } fn_args;
 };
 
