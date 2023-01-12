@@ -147,6 +147,15 @@ bool RadiolibTask::loop(System &system) {
         } else {
           std::shared_ptr<APRSMessage> msg = std::shared_ptr<APRSMessage>(new APRSMessage());
           msg->decode(str.substring(3));
+          String msgData = msg->getBody()->getData();
+
+          // Replace all non-printable chars by spaces
+          for (char c = 0; c < ' '; c++) {
+            msgData.replace(String(c), " ");
+          }
+
+          msg->getBody()->setData(msgData);
+
           _fromModem.addElement(msg);
           logger.debug(getName(), "[%s] Received packet '%s' with RSSI %.0fdBm, SNR %.2fdB and FreqErr %fHz", timeString().c_str(), msg->toString().c_str(), radio->getRSSI(), radio->getSNR(), -radio->getFrequencyError());
           system.getDisplay().addFrame(std::shared_ptr<DisplayFrame>(new TextFrame("LoRa", msg->toString().c_str())));
