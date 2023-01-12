@@ -49,7 +49,7 @@ MQTTTask        *mqttTask;
 WebTask          webTask;
 AprsIsTask       aprsIsTask(toAprsIs);
 RouterTask       routerTask(fromModem, toModem, toAprsIs, toMQTT);
-BeaconTask       beaconTask(toModem, toAprsIs);
+BeaconTask      *beaconTask;
 PacketLoggerTask packetLoggerTask("packets.log");
 
 void setup() {
@@ -151,7 +151,8 @@ void setup() {
   LoRaSystem.getTaskManager().addTask(&displayTask);
   LoRaSystem.getTaskManager().addTask(&modemTask);
   LoRaSystem.getTaskManager().addTask(&routerTask);
-  LoRaSystem.getTaskManager().addTask(&beaconTask);
+  beaconTask = new BeaconTask(4, 0, LoRaSystem, toModem, toAprsIs);
+  LoRaSystem.getTaskManager().addFreeRTOSTask(beaconTask);
 
   bool tcpip = false;
 

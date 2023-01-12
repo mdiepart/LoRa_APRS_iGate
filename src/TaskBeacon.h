@@ -8,22 +8,21 @@
 #include <TaskMQTT.h>
 #include <TaskManager.h>
 
-class BeaconTask : public Task {
+class BeaconTask : public FreeRTOSTask {
 public:
-  BeaconTask(TaskQueue<std::shared_ptr<APRSMessage>> &toModem, TaskQueue<std::shared_ptr<APRSMessage>> &toAprsIs);
-  virtual ~BeaconTask();
+  BeaconTask(UBaseType_t priority, BaseType_t coreId, System &system, TaskQueue<std::shared_ptr<APRSMessage>> &toModem, TaskQueue<std::shared_ptr<APRSMessage>> &toAprsIs);
 
-  virtual bool setup(System &system) override;
-  virtual bool loop(System &system) override;
-  bool         sendBeacon(System &system);
+  void worker() override;
+  bool sendBeacon();
 
 private:
-  TaskQueue<std::shared_ptr<APRSMessage>> &_toModem;
-  TaskQueue<std::shared_ptr<APRSMessage>> &_toAprsIs;
+  TaskQueue<std::shared_ptr<APRSMessage>> *_toModem;
+  TaskQueue<std::shared_ptr<APRSMessage>> *_toAprsIs;
 
   std::shared_ptr<APRSMessage> _beaconMsg;
   Timer                        _beacon_timer;
 
+  System        *_system;
   HardwareSerial _ss;
   TinyGPSPlus    _gps;
   bool           _useGps;

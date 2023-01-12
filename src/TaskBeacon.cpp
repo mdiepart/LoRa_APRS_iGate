@@ -6,74 +6,71 @@
 #include "TaskBeacon.h"
 #include "project_configuration.h"
 
-BeaconTask::BeaconTask(TaskQueue<std::shared_ptr<APRSMessage>> &toModem, TaskQueue<std::shared_ptr<APRSMessage>> &toAprsIs) : Task(TASK_BEACON, TaskBeacon), _toModem(toModem), _toAprsIs(toAprsIs), _ss(1), _useGps(false) {
-}
-
-BeaconTask::~BeaconTask() {
-}
-
 OneButton BeaconTask::_userButton;
 bool      BeaconTask::_send_update;
 uint      BeaconTask::_instances;
+
+BeaconTask::BeaconTask(UBaseType_t priority, BaseType_t coreId, System &system, TaskQueue<std::shared_ptr<APRSMessage>> &toModem, TaskQueue<std::shared_ptr<APRSMessage>> &toAprsIs) : FreeRTOSTask(TASK_BEACON, TaskBeacon, priority, 2048, coreId), _ss(1), _useGps(false) {
+  _system   = &system;
+  _toModem  = &toModem;
+  _toAprsIs = &toAprsIs;
+  start();
+}
 
 void BeaconTask::pushButton() {
   _send_update = true;
 }
 
-bool BeaconTask::setup(System &system) {
-  if (_instances++ == 0 && system.getBoardConfig()->Button > 0) {
-    _userButton = OneButton(system.getBoardConfig()->Button, true, true);
+void BeaconTask::worker() {
+  if (_instances++ == 0 && _system->getBoardConfig()->Button > 0) {
+    _userButton = OneButton(_system->getBoardConfig()->Button, true, true);
     _userButton.attachClick(pushButton);
     _send_update = false;
   }
 
-  _useGps = system.getUserConfig()->beacon.use_gps;
+  _useGps    = _system->getUserConfig()->beacon.use_gps;
+  _beaconMsg = std::shared_ptr<APRSMessage>(new APRSMessage());
+  _beaconMsg->setSource(_system->getUserConfig()->callsign);
+  _beaconMsg->setDestination("APLG01");
+  _beacon_timer.setTimeout(_system->getUserConfig()->beacon.timeout * 60 * 1000);
 
   if (_useGps) {
-    if (system.getBoardConfig()->GpsRx != 0) {
-      _ss.begin(9600, SERIAL_8N1, system.getBoardConfig()->GpsTx, system.getBoardConfig()->GpsRx);
+    if (_system->getBoardConfig()->GpsRx != 0) {
+      _ss.begin(9600, SERIAL_8N1, _system->getBoardConfig()->GpsTx, _system->getBoardConfig()->GpsRx);
     } else {
       logger.info(getName(), "NO GPS found.");
       _useGps = false;
     }
   }
-  // setup beacon
-  _beacon_timer.setTimeout(system.getUserConfig()->beacon.timeout * 60 * 1000);
 
-  _beaconMsg = std::shared_ptr<APRSMessage>(new APRSMessage());
-  _beaconMsg->setSource(system.getUserConfig()->callsign);
-  _beaconMsg->setDestination("APLG01");
+  for (;;) {
+    if (_useGps) {
+      while (_ss.available() > 0) {
+        char c = _ss.read();
+        _gps.encode(c);
+      }
+    }
 
-  return true;
+    _userButton.tick();
+
+    // check for beacon
+    if (_beacon_timer.check() || _send_update) {
+      if (sendBeacon()) {
+        _send_update = false;
+        _beacon_timer.start();
+      }
+    }
+
+    uint32_t diff = _beacon_timer.getTriggerTimeInSec();
+    _stateInfo    = "beacon " + String(uint32_t(diff / 600)) + String(uint32_t(diff / 60) % 10) + ":" + String(uint32_t(diff / 10) % 6) + String(uint32_t(diff % 10));
+
+    vTaskDelay(500 / portTICK_PERIOD_MS);
+  }
 }
 
-bool BeaconTask::loop(System &system) {
-  if (_useGps) {
-    while (_ss.available() > 0) {
-      char c = _ss.read();
-      _gps.encode(c);
-    }
-  }
-
-  _userButton.tick();
-
-  // check for beacon
-  if (_beacon_timer.check() || _send_update) {
-    if (sendBeacon(system)) {
-      _send_update = false;
-      _beacon_timer.start();
-    }
-  }
-
-  uint32_t diff = _beacon_timer.getTriggerTimeInSec();
-  _stateInfo    = "beacon " + String(uint32_t(diff / 600)) + String(uint32_t(diff / 60) % 10) + ":" + String(uint32_t(diff / 10) % 6) + String(uint32_t(diff % 10));
-
-  return true;
-}
-
-bool BeaconTask::sendBeacon(System &system) {
-  double lat = system.getUserConfig()->beacon.positionLatitude;
-  double lng = system.getUserConfig()->beacon.positionLongitude;
+bool BeaconTask::sendBeacon() {
+  double lat = _system->getUserConfig()->beacon.positionLatitude;
+  double lng = _system->getUserConfig()->beacon.positionLongitude;
 
   if (_useGps) {
     if (_gps.location.isUpdated()) {
@@ -106,19 +103,19 @@ bool BeaconTask::sendBeacon(System &system) {
 
   aprs_data += "& sT"; // No course, speed, range or compression type byte
 
-  _beaconMsg->getBody()->setData(aprs_data + system.getUserConfig()->beacon.message);
+  _beaconMsg->getBody()->setData(aprs_data + _system->getUserConfig()->beacon.message);
 
   logger.info(getName(), "[%s] %s", timeString().c_str(), _beaconMsg->encode().c_str());
 
-  if (system.getUserConfig()->aprs_is.active) {
-    _toAprsIs.addElement(_beaconMsg);
+  if (_system->getUserConfig()->aprs_is.active) {
+    _toAprsIs->addElement(_beaconMsg);
   }
 
-  if (system.getUserConfig()->digi.beacon) {
-    _toModem.addElement(_beaconMsg);
+  if (_system->getUserConfig()->digi.beacon) {
+    _toModem->addElement(_beaconMsg);
   }
 
-  system.getDisplay().addFrame(std::shared_ptr<DisplayFrame>(new TextFrame("BEACON", _beaconMsg->toString())));
+  _system->getDisplay().addFrame(std::shared_ptr<DisplayFrame>(new TextFrame("BEACON", _beaconMsg->toString())));
 
   return true;
 }
