@@ -4,13 +4,15 @@
 #include <Display.h>
 #include <TaskManager.h>
 
-class DisplayTask : public Task {
+class DisplayTask : public FreeRTOSTask {
 public:
-  DisplayTask();
+  DisplayTask(UBaseType_t priority, BaseType_t coreId, System &system);
   virtual ~DisplayTask();
 
-  virtual bool setup(System &system) override;
-  virtual bool loop(System &system) override;
+  void worker() override;
+
+private:
+  System *_system;
 };
 
 #endif
