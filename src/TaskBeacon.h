@@ -13,7 +13,6 @@ public:
   BeaconTask(UBaseType_t priority, BaseType_t coreId, System &system, TaskQueue<std::shared_ptr<APRSMessage>> &toModem, TaskQueue<std::shared_ptr<APRSMessage>> &toAprsIs);
 
   void worker() override;
-  bool sendBeacon();
 
 private:
   TaskQueue<std::shared_ptr<APRSMessage>> *_toModem;
@@ -26,6 +25,11 @@ private:
   HardwareSerial _ss;
   TinyGPSPlus    _gps;
   bool           _useGps;
+  bool           _beaconMsgReady;
+  bool           _aprsBeaconSent;
+
+  void onGpsSSReceive();
+  bool buildBeaconMsg();
 
   static uint      _instances;
   static OneButton _userButton;

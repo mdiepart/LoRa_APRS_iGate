@@ -10,7 +10,7 @@ OneButton BeaconTask::_userButton;
 bool      BeaconTask::_send_update;
 uint      BeaconTask::_instances;
 
-BeaconTask::BeaconTask(UBaseType_t priority, BaseType_t coreId, System &system, TaskQueue<std::shared_ptr<APRSMessage>> &toModem, TaskQueue<std::shared_ptr<APRSMessage>> &toAprsIs) : FreeRTOSTask(TASK_BEACON, TaskBeacon, priority, 2048, coreId), _ss(1), _useGps(false) {
+BeaconTask::BeaconTask(UBaseType_t priority, BaseType_t coreId, System &system, TaskQueue<std::shared_ptr<APRSMessage>> &toModem, TaskQueue<std::shared_ptr<APRSMessage>> &toAprsIs) : FreeRTOSTask(TASK_BEACON, TaskBeacon, priority, 2048, coreId), _ss(1), _useGps(false), _beaconMsgReady(false), _aprsBeaconSent(false) {
   _system   = &system;
   _toModem  = &toModem;
   _toAprsIs = &toAprsIs;
@@ -37,27 +37,55 @@ void BeaconTask::worker() {
   if (_useGps) {
     if (_system->getBoardConfig()->GpsRx != 0) {
       _ss.begin(9600, SERIAL_8N1, _system->getBoardConfig()->GpsTx, _system->getBoardConfig()->GpsRx);
+      auto onReceiveFn = std::bind(std::mem_fn(&BeaconTask::onGpsSSReceive), this);
+      _ss.onReceive(onReceiveFn);
     } else {
       APP_LOGI(getName(), "NO GPS found.");
       _useGps = false;
     }
   }
 
-  for (;;) {
-    if (_useGps) {
-      while (_ss.available() > 0) {
-        char c = _ss.read();
-        _gps.encode(c);
-      }
-    }
+  uint32_t aprsSentTime = 0;
+  while (!_system->isWifiOrEthConnected()) {
+    vTaskDelay(1500 / portTICK_PERIOD_MS);
+  }
 
-    _userButton.tick();
+  for (;;) {
+    if (_system->getBoardConfig()->Button > 0) {
+      _userButton.tick();
+    }
 
     // check for beacon
     if (_beacon_timer.check() || _send_update) {
-      if (sendBeacon()) {
-        _send_update = false;
+      if (buildBeaconMsg()) {
+        _beaconMsgReady = true;
+        _aprsBeaconSent = false;
+        _send_update    = false;
         _beacon_timer.start();
+      }
+    }
+
+    if (_beaconMsgReady) {
+      if (_system->getUserConfig()->aprs_is.active && !_aprsBeaconSent) {
+        _toAprsIs->addElement(_beaconMsg);
+        APP_LOGI(getName(), "[IP Beacon][%s] %s", timeString().c_str(), _beaconMsg->encode().c_str());
+        aprsSentTime    = millis();
+        _aprsBeaconSent = true;
+        _system->getDisplay().addFrame(std::shared_ptr<DisplayFrame>(new TextFrame("IP BEACON", _beaconMsg->toString())));
+      } else if (!_system->getUserConfig()->aprs_is.active) {
+        aprsSentTime    = millis() - 30000;
+        _aprsBeaconSent = true;
+      }
+
+      if (_system->getUserConfig()->digi.beacon) {
+        if (millis() - aprsSentTime >= 30000) {
+          _toModem->addElement(_beaconMsg);
+          APP_LOGI(getName(), "[RF Beacon][%s] %s", timeString().c_str(), _beaconMsg->encode().c_str());
+          _system->getDisplay().addFrame(std::shared_ptr<DisplayFrame>(new TextFrame("RF BEACON", _beaconMsg->toString())));
+          _beaconMsgReady = false;
+        }
+      } else {
+        _beaconMsgReady = false;
       }
     }
 
@@ -68,7 +96,17 @@ void BeaconTask::worker() {
   }
 }
 
-bool BeaconTask::sendBeacon() {
+void BeaconTask::onGpsSSReceive() {
+  uint8_t buffer[64];
+  size_t  n = min<size_t>(_ss.available(), 64);
+  n         = _ss.readBytes(buffer, n);
+
+  for (size_t i = 0; i < n; i++) {
+    _gps.encode(buffer[i]);
+  }
+}
+
+bool BeaconTask::buildBeaconMsg() {
   double lat = _system->getUserConfig()->beacon.positionLatitude;
   double lng = _system->getUserConfig()->beacon.positionLongitude;
 
@@ -104,18 +142,6 @@ bool BeaconTask::sendBeacon() {
   aprs_data += "& sT"; // No course, speed, range or compression type byte
 
   _beaconMsg->getBody()->setData(aprs_data + _system->getUserConfig()->beacon.message);
-
-  APP_LOGI(getName(), "[%s] %s", timeString().c_str(), _beaconMsg->encode().c_str());
-
-  if (_system->getUserConfig()->aprs_is.active) {
-    _toAprsIs->addElement(_beaconMsg);
-  }
-
-  if (_system->getUserConfig()->digi.beacon) {
-    _toModem->addElement(_beaconMsg);
-  }
-
-  _system->getDisplay().addFrame(std::shared_ptr<DisplayFrame>(new TextFrame("BEACON", _beaconMsg->toString())));
 
   return true;
 }
