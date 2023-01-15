@@ -30,13 +30,13 @@ std::list<FreeRTOSTask *> TaskManager::getFreeRTOSTasks() {
 }
 
 bool TaskManager::setup(System &system) {
-  logger.info(MODULE_NAME, "will setup all tasks...");
+  APP_LOGI(MODULE_NAME, "will setup all tasks...");
   for (Task *elem : _alwaysRunTasks) {
-    logger.debug(MODULE_NAME, "call setup for %s", elem->getName().c_str());
+    APP_LOGD(MODULE_NAME, "call setup for %s", elem->getName());
     elem->setup(system);
   }
   for (Task *elem : _tasks) {
-    logger.debug(MODULE_NAME, "call setup for %s", elem->getName().c_str());
+    APP_LOGD(MODULE_NAME, "call setup for %s", elem->getName());
     elem->setup(system);
   }
   _nextTask = _tasks.begin();
@@ -60,7 +60,7 @@ bool TaskManager::loop(System &system) {
 void StatusFrame::drawStatusPage(Bitmap &bitmap) {
   int y = 0;
   for (Task *task : _tasks) {
-    int x = bitmap.drawString(0, y, (task->getName()).substring(0, task->getName().indexOf("Task")));
+    int x = bitmap.drawString(0, y, (String(task->getName())).substring(0, String(task->getName()).indexOf("Task")));
     x     = bitmap.drawString(x, y, ": ");
     if (task->getStateInfo() == "") {
       switch (task->getState()) {

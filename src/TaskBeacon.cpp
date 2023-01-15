@@ -38,7 +38,7 @@ void BeaconTask::worker() {
     if (_system->getBoardConfig()->GpsRx != 0) {
       _ss.begin(9600, SERIAL_8N1, _system->getBoardConfig()->GpsTx, _system->getBoardConfig()->GpsRx);
     } else {
-      logger.info(getName(), "NO GPS found.");
+      APP_LOGI(getName(), "NO GPS found.");
       _useGps = false;
     }
   }
@@ -105,7 +105,7 @@ bool BeaconTask::sendBeacon() {
 
   _beaconMsg->getBody()->setData(aprs_data + _system->getUserConfig()->beacon.message);
 
-  logger.info(getName(), "[%s] %s", timeString().c_str(), _beaconMsg->encode().c_str());
+  APP_LOGI(getName(), "[%s] %s", timeString().c_str(), _beaconMsg->encode().c_str());
 
   if (_system->getUserConfig()->aprs_is.active) {
     _toAprsIs->addElement(_beaconMsg);

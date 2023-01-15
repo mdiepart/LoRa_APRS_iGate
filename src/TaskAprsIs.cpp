@@ -41,17 +41,17 @@ bool AprsIsTask::loop(System &system) {
 }
 
 bool AprsIsTask::connect(System &system) {
-  logger.info(getName(), "connecting to APRS-IS server: %s on port: %d", system.getUserConfig()->aprs_is.server.c_str(), system.getUserConfig()->aprs_is.port);
+  APP_LOGI(getName(), "connecting to APRS-IS server: %s on port: %d", system.getUserConfig()->aprs_is.server.c_str(), system.getUserConfig()->aprs_is.port);
   APRS_IS::ConnectionStatus status = _aprs_is.connect(system.getUserConfig()->aprs_is.server, system.getUserConfig()->aprs_is.port);
   if (status == APRS_IS::ERROR_CONNECTION) {
-    logger.error(getName(), "Something went wrong on connecting! Is the server reachable?");
-    logger.error(getName(), "Connection failed.");
+    APP_LOGE(getName(), "Something went wrong on connecting! Is the server reachable?");
+    APP_LOGE(getName(), "Connection failed.");
     return false;
   } else if (status == APRS_IS::ERROR_PASSCODE) {
-    logger.error(getName(), "User can not be verified with passcode!");
-    logger.error(getName(), "Connection failed.");
+    APP_LOGE(getName(), "User can not be verified with passcode!");
+    APP_LOGE(getName(), "Connection failed.");
     return false;
   }
-  logger.info(getName(), "Connected to APRS-IS server!");
+  APP_LOGI(getName(), "Connected to APRS-IS server!");
   return true;
 }

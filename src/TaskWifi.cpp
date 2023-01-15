@@ -28,7 +28,7 @@ void WifiTask::worker() {
   WiFi.onEvent(NetworkEvent);
 
   for (Configuration::Wifi::AP ap : _system->getUserConfig()->wifi.APs) {
-    logger.debug(getName(), "Looking for AP: %s", ap.SSID.c_str());
+    APP_LOGD(getName(), "Looking for AP: %s", ap.SSID.c_str());
     _wiFiMulti.addAP(ap.SSID.c_str(), ap.password.c_str());
   }
 

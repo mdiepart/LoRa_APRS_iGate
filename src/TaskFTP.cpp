@@ -14,7 +14,7 @@ FTPTask::FTPTask(UBaseType_t priority, BaseType_t coreId, System &system) : Free
 
 void FTPTask::worker() {
   for (Configuration::Ftp::User user : _system->getUserConfig()->ftp.users) {
-    logger.debug(getName(), "Adding user to FTP Server: %s", user.name.c_str());
+    APP_LOGD(getName(), "Adding user to FTP Server: %s", user.name.c_str());
     _ftpServer.addUser(user.name, user.password);
   }
   _ftpServer.addFilesystem("SPIFFS", &SPIFFS);
@@ -28,7 +28,7 @@ void FTPTask::worker() {
   for (;;) {
     _ftpServer.handle();
     if (configWasOpen && _ftpServer.countConnections() == 0) {
-      logger.warn(getName(), "Maybe the config has been changed via FTP, lets restart now to get the new config...");
+      APP_LOGW(getName(), "Maybe the config has been changed via FTP, lets restart now to get the new config...");
       ESP.restart();
     }
 

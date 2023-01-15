@@ -9,7 +9,7 @@ MQTTTask::MQTTTask(UBaseType_t priority, BaseType_t coreId, System &system, Task
   _system = &system;
   _toMQTT = &toMQTT;
   start();
-  logger.info(getName(), "MQTT class created.");
+  APP_LOGI(getName(), "MQTT class created.");
 }
 
 void MQTTTask::worker() {
@@ -23,11 +23,11 @@ void MQTTTask::worker() {
 
     if (!_MQTT.connected()) {
       if (!_MQTT.connect(_system->getUserConfig()->callsign.c_str(), _system->getUserConfig()->mqtt.name.c_str(), _system->getUserConfig()->mqtt.password.c_str())) {
-        logger.info(getName(), "Could not connect to MQTT broker.");
+        APP_LOGI(getName(), "Could not connect to MQTT broker.");
         vTaskDelay(1000);
         continue;
       } else {
-        logger.info(getName(), "Connected to MQTT broker as: %s", _system->getUserConfig()->callsign.c_str());
+        APP_LOGI(getName(), "Connected to MQTT broker as: %s", _system->getUserConfig()->callsign.c_str());
       }
     }
 
@@ -51,7 +51,7 @@ void MQTTTask::worker() {
         topic = topic + "/";
       }
       topic = topic + _system->getUserConfig()->callsign;
-      logger.debug(getName(), "Send MQTT with topic: '%s', data: %s", topic.c_str(), r.c_str());
+      APP_LOGD(getName(), "Send MQTT with topic: '%s', data: %s", topic.c_str(), r.c_str());
       _MQTT.publish(topic.c_str(), r.c_str());
     }
 

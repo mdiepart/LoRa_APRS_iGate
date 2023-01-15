@@ -9,7 +9,7 @@
 NTPTask::NTPTask(UBaseType_t priority, BaseType_t coreId, System &system) : FreeRTOSTask(TASK_NTP, TaskNtp, priority, 1748, coreId) {
   _system = &system;
   start();
-  logger.debug(getName(), "NTP class created.");
+  APP_LOGD(getName(), "NTP class created.");
 }
 
 void NTPTask::worker() {
@@ -18,7 +18,7 @@ void NTPTask::worker() {
   TickType_t previousWakeTime = xTaskGetTickCount();
   TickType_t wakeInterval     = 3600000 * portTICK_PERIOD_MS; // Every hour
   _ntpClient.begin();
-  logger.debug(getName(), "NTP Task initialized.");
+  APP_LOGD(getName(), "NTP Task initialized.");
   for (;;) {
     if (!_system->isWifiOrEthConnected()) {
       _state     = Warning;
@@ -28,7 +28,7 @@ void NTPTask::worker() {
       _state     = Okay;
       _stateInfo = _ntpClient.getFormattedTime();
       setTime(_ntpClient.getEpochTime());
-      logger.info(getName(), "Current time: %s", _ntpClient.getFormattedTime().c_str());
+      APP_LOGI(getName(), "Current time: %s", _ntpClient.getFormattedTime().c_str());
       xTaskDelayUntil(&previousWakeTime, wakeInterval);
     } else {
       vTaskDelay(1000 * portTICK_PERIOD_MS);

@@ -20,13 +20,13 @@ ConfigurationManagement::~ConfigurationManagement() {
 void ConfigurationManagement::readConfiguration(Configuration &conf) {
   File file = SPIFFS.open(mFilePath);
   if (!file) {
-    logger.error(MODULE_NAME, "Failed to open file for reading, using default configuration.");
+    APP_LOGE(MODULE_NAME, "Failed to open file for reading, using default configuration.");
     return;
   }
   DynamicJsonDocument  data(2048);
   DeserializationError error = deserializeJson(data, file);
   if (error) {
-    logger.warn(MODULE_NAME, "Failed to read file, using default configuration.");
+    APP_LOGW(MODULE_NAME, "Failed to read file, using default configuration.");
   }
   // serializeJson(data, Serial);
   // Serial.println();
@@ -41,7 +41,7 @@ void ConfigurationManagement::readConfiguration(Configuration &conf) {
 void ConfigurationManagement::writeConfiguration(Configuration &conf) {
   File file = SPIFFS.open(mFilePath, "w");
   if (!file) {
-    logger.error(MODULE_NAME, "Failed to open file for writing...");
+    APP_LOGE(MODULE_NAME, "Failed to open file for writing...");
     return;
   }
   DynamicJsonDocument data(2048);

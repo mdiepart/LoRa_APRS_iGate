@@ -28,8 +28,8 @@ public:
   virtual ~Task() {
   }
 
-  String getName() const {
-    return _name;
+  const char *getName() const {
+    return _name.c_str();
   }
   int getTaskId() const {
     return _taskId;
