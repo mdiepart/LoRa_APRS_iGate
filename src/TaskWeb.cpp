@@ -18,10 +18,6 @@ WebTask::~WebTask() {
 }
 
 bool WebTask::setup(System &system) {
-  http_server.begin();
-  _stateInfo = "Online";
-  // system     = &sys;
-
   Webserver = webserver();
   {
     using namespace std::placeholders;
@@ -48,8 +44,8 @@ bool WebTask::setup(System &system) {
     Webserver.addTarget(webserver::GET, "/packets.log", fn_packet_logs); // /packets.log; auth
   }
 
-  APP_LOGI(getName(), "Web server started.");
-  isServerStarted = true;
+  isServerStarted = false;
+  _stateInfo      = "Awaiting network";
   return true;
 }
 
@@ -58,12 +54,14 @@ bool WebTask::loop(System &system) {
     http_server.close();
     isServerStarted = false;
     APP_LOGW(getName(), "Closed HTTP server because network connection was lost.");
+    _stateInfo = "Awaiting network";
   }
 
   if (!isServerStarted && system.isWifiOrEthConnected()) {
     http_server.begin();
     isServerStarted = true;
     APP_LOGW(getName(), "Network connection recovered, http server restarted.");
+    _stateInfo = "Online";
   }
 
   // Check for too old client sessions every 10s
