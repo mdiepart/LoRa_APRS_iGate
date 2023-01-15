@@ -5,20 +5,19 @@
 #include <APRSMessage.h>
 #include <TaskManager.h>
 
-class AprsIsTask : public Task {
+class AprsIsTask : public FreeRTOSTask {
 public:
-  explicit AprsIsTask(TaskQueue<std::shared_ptr<APRSMessage>> &toAprsIs);
+  explicit AprsIsTask(UBaseType_t priority, BaseType_t coreId, System &system, TaskQueue<std::shared_ptr<APRSMessage>> &toAprsIs);
   virtual ~AprsIsTask();
 
-  virtual bool setup(System &system) override;
-  virtual bool loop(System &system) override;
+  void worker() override;
 
 private:
   APRS_IS _aprs_is;
 
-  TaskQueue<std::shared_ptr<APRSMessage>> &_toAprsIs;
-
-  bool connect(System &system);
+  TaskQueue<std::shared_ptr<APRSMessage>> *_toAprsIs;
+  System                                  *_system;
+  bool                                     connect();
 };
 
 #endif

@@ -47,7 +47,7 @@ NTPTask         *ntpTask;
 FTPTask         *ftpTask;
 MQTTTask        *mqttTask;
 WebTask          webTask;
-AprsIsTask       aprsIsTask(toAprsIs);
+AprsIsTask      *aprsIsTask;
 RouterTask       routerTask(fromModem, toModem, toAprsIs, toMQTT);
 BeaconTask      *beaconTask;
 PacketLoggerTask packetLoggerTask("packets.log");
@@ -151,7 +151,7 @@ void setup() {
   LoRaSystem.getTaskManager().addTask(&displayTask);
   LoRaSystem.getTaskManager().addTask(&modemTask);
   LoRaSystem.getTaskManager().addTask(&routerTask);
-  beaconTask = new BeaconTask(4, 0, LoRaSystem, toModem, toAprsIs);
+  beaconTask = new BeaconTask(3, 0, LoRaSystem, toModem, toAprsIs);
   LoRaSystem.getTaskManager().addFreeRTOSTask(beaconTask);
 
   bool tcpip = false;
@@ -174,7 +174,8 @@ void setup() {
     }
 
     if (userConfig.aprs_is.active) {
-      LoRaSystem.getTaskManager().addTask(&aprsIsTask);
+      aprsIsTask = new AprsIsTask(4, 0, LoRaSystem, toAprsIs);
+      LoRaSystem.getTaskManager().addFreeRTOSTask(aprsIsTask);
     }
 
     if (userConfig.mqtt.active) {
