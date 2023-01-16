@@ -42,7 +42,7 @@ DisplayTask *displayTask;
 RadiolibTask     modemTask(fromModem, toModem);
 EthTask         *ethTask;
 WifiTask        *wifiTask;
-OTATask          otaTask;
+OTATask         *otaTask;
 NTPTask         *ntpTask;
 FTPTask         *ftpTask;
 MQTTTask        *mqttTask;
@@ -169,7 +169,11 @@ void setup() {
   }
 
   if (tcpip) {
-    LoRaSystem.getTaskManager().addTask(&otaTask);
+    if (LoRaSystem.getUserConfig()->ota.active) {
+      otaTask = new OTATask(4, 1, LoRaSystem);
+      LoRaSystem.getTaskManager().addFreeRTOSTask(otaTask);
+    }
+
     if (userConfig.ftp.active) {
       ftpTask = new FTPTask(1, 1, LoRaSystem);
       LoRaSystem.getTaskManager().addFreeRTOSTask(ftpTask);

@@ -246,8 +246,7 @@ void WebTask::enableota_page(WiFiClient &client, webserver::Header_t &header, Sy
   // Load page and replace placeholder
   String page = loadPage("/enableOTA.html");
 
-  std::list<Task *> tasks = system.getTaskManager().getTasks();
-  for (Task *it : system.getTaskManager().getTasks()) {
+  for (FreeRTOSTask *it : system.getTaskManager().getFreeRTOSTasks()) {
     if (it->getTaskId() == TaskOta) {
       ((OTATask *)it)->enableOTA(5 * 60 * 1000); // Enabling OTA for 5 minutes
       APP_LOGI(getName(), "User enabled OTA for 5 minutes via web interface");
