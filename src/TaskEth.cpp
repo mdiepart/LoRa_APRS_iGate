@@ -64,13 +64,15 @@ void NetworkEvent(WiFiEvent_t event) {
   }
 }
 
-EthTask::EthTask() : Task(TASK_ETH, TaskEth) {
+EthTask::EthTask(UBaseType_t priority, BaseType_t coreId, System &system) : FreeRTOSTask(TASK_ETH, TaskEth, priority, 2048, coreId) {
+  _system = &system;
+  start();
 }
 
 EthTask::~EthTask() {
 }
 
-bool EthTask::setup(System &system) {
+void EthTask::worker() {
   WiFi.onEvent(NetworkEvent);
 
   constexpr uint8_t          ETH_NRST      = 5;
@@ -93,27 +95,25 @@ bool EthTask::setup(System &system) {
 
   ETH.begin(ETH_ADDR, ETH_POWER_PIN, ETH_MDC_PIN, ETH_MDIO_PIN, ETH_TYPE, ETH_CLK);
 
-  if (!system.getUserConfig()->network.DHCP) {
-    ETH.config(system.getUserConfig()->network.static_.ip, system.getUserConfig()->network.static_.gateway, system.getUserConfig()->network.static_.subnet, system.getUserConfig()->network.static_.dns1, system.getUserConfig()->network.static_.dns2);
+  if (!_system->getUserConfig()->network.DHCP) {
+    ETH.config(_system->getUserConfig()->network.static_.ip, _system->getUserConfig()->network.static_.gateway, _system->getUserConfig()->network.static_.subnet, _system->getUserConfig()->network.static_.dns1, _system->getUserConfig()->network.static_.dns2);
   }
-  if (system.getUserConfig()->network.hostname.overwrite) {
-    ETH.setHostname(system.getUserConfig()->network.hostname.name.c_str());
+  if (_system->getUserConfig()->network.hostname.overwrite) {
+    ETH.setHostname(_system->getUserConfig()->network.hostname.name.c_str());
   } else {
-    ETH.setHostname(system.getUserConfig()->callsign.c_str());
+    ETH.setHostname(_system->getUserConfig()->callsign.c_str());
   }
 
-  return true;
-}
-
-bool EthTask::loop(System &system) {
-  if (!eth_connected) {
-    system.connectedViaEth(false);
-    _stateInfo = "Ethernet not connected";
-    _state     = Error;
-    return false;
+  for (;;) {
+    if (!eth_connected) {
+      _system->connectedViaEth(false);
+      _stateInfo = "Ethernet not connected";
+      _state     = Error;
+    } else {
+      _system->connectedViaEth(true);
+      _stateInfo = ETH.localIP().toString();
+      _state     = Okay;
+    }
+    vTaskDelay(1000 / portTICK_PERIOD_MS);
   }
-  system.connectedViaEth(true);
-  _stateInfo = ETH.localIP().toString();
-  _state     = Okay;
-  return true;
 }

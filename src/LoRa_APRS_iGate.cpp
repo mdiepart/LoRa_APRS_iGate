@@ -40,7 +40,7 @@ Configuration userConfig;
 DisplayTask *displayTask;
 // ModemTask   modemTask(fromModem, toModem);
 RadiolibTask     modemTask(fromModem, toModem);
-EthTask          ethTask;
+EthTask         *ethTask;
 WifiTask        *wifiTask;
 OTATask          otaTask;
 NTPTask         *ntpTask;
@@ -163,7 +163,8 @@ void setup() {
     tcpip = true;
   }
   if (boardConfig->Type == eETH_BOARD) {
-    LoRaSystem.getTaskManager().addAlwaysRunTask(&ethTask);
+    ethTask = new EthTask(6, 0, LoRaSystem);
+    LoRaSystem.getTaskManager().addFreeRTOSTask(ethTask);
     tcpip = true;
   }
 
