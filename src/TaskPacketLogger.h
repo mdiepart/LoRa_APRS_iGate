@@ -9,14 +9,14 @@
 
 #define SEPARATOR "\t"
 
-class PacketLoggerTask : public Task {
+class PacketLoggerTask : public FreeRTOSTask {
 
 public:
-  PacketLoggerTask(String filename);
+  PacketLoggerTask(UBaseType_t priority, BaseType_t coreId, System &system, const String filename);
   virtual ~PacketLoggerTask();
 
-  bool   setup(System &system) override;
-  bool   loop(System &system) override;
+  void worker() override;
+
   void   logPacket(const String &callsign, const String &target, const String &path, const String &data, float RSSI, float SNR, float frequency_error);
   String getTail(bool use_cache = true);
   bool   getFullLogs(WiFiClient &client);
@@ -33,20 +33,20 @@ private:
     char  data[253];
   } log_line;
 
-  void rotate(System &system);
+  void rotate();
 
-  bool                 enabled;
-  size_t               nb_lines;
-  size_t               nb_files;
-  size_t               counter;
-  size_t               max_tail_length;
-  size_t               curr_tail_length;
-  unsigned int         total_count;
-  String               filename;
-  String               tail;
+  size_t               _nb_lines;
+  size_t               _nb_files;
+  size_t               _counter;
+  size_t               _max_tail_length;
+  size_t               _curr_tail_length;
+  unsigned int         _total_count;
+  String               _filename;
+  String               _tail;
   const String         HEADER     = String("NUMBER" SEPARATOR "TIMESTAMP" SEPARATOR "CALLSIGN" SEPARATOR "TARGET" SEPARATOR "PATH" SEPARATOR "DATA" SEPARATOR "RSSI" SEPARATOR "SNR" SEPARATOR "FREQ_ERROR");
   const size_t         QUEUE_SIZE = 5;
-  std::queue<log_line> log_queue;
+  std::queue<log_line> _log_queue;
+  System              *_system;
 };
 
 #endif

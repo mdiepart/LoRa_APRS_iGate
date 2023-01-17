@@ -39,18 +39,18 @@ Configuration userConfig;
 
 DisplayTask *displayTask;
 // ModemTask   modemTask(fromModem, toModem);
-RadiolibTask     modemTask(fromModem, toModem);
-EthTask         *ethTask;
-WifiTask        *wifiTask;
-OTATask         *otaTask;
-NTPTask         *ntpTask;
-FTPTask         *ftpTask;
-MQTTTask        *mqttTask;
-WebTask          webTask;
-AprsIsTask      *aprsIsTask;
-RouterTask       routerTask(fromModem, toModem, toAprsIs, toMQTT);
-BeaconTask      *beaconTask;
-PacketLoggerTask packetLoggerTask("packets.log");
+RadiolibTask      modemTask(fromModem, toModem);
+EthTask          *ethTask;
+WifiTask         *wifiTask;
+OTATask          *otaTask;
+NTPTask          *ntpTask;
+FTPTask          *ftpTask;
+MQTTTask         *mqttTask;
+WebTask           webTask;
+AprsIsTask       *aprsIsTask;
+RouterTask        routerTask(fromModem, toModem, toAprsIs, toMQTT);
+BeaconTask       *beaconTask;
+PacketLoggerTask *packetLoggerTask;
 
 void setup() {
   esp_task_wdt_init(10, true);
@@ -194,8 +194,11 @@ void setup() {
     }
   }
 
-  LoRaSystem.getTaskManager().addAlwaysRunTask(&packetLoggerTask);
-  LoRaSystem.setPacketLogger(&packetLoggerTask);
+  if (userConfig.packetLogger.active) {
+    packetLoggerTask = new PacketLoggerTask(2, 1, LoRaSystem, "packets.log");
+    LoRaSystem.getTaskManager().addFreeRTOSTask(packetLoggerTask);
+    LoRaSystem.setPacketLogger(packetLoggerTask);
+  }
 
   esp_task_wdt_reset();
   LoRaSystem.getTaskManager().setup(LoRaSystem);
