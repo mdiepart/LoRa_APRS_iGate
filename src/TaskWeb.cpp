@@ -213,7 +213,7 @@ void WebTask::info_page(WiFiClient &client, webserver::Header_t &header, System 
         tasklist += "<p class=\"task error\">";
         break;
       }
-      tasklist += task->getName() + ": " + task->getStateInfo() + "</p>";
+      tasklist += String(task->getName()) + ": " + task->getStateInfo() + "</p>";
     }
   }
   page.replace("$$TASKLIST$$", tasklist);

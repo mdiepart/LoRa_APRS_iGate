@@ -63,8 +63,8 @@ public:
 
   virtual void worker() = 0;
 
-  String getName() const {
-    return _name;
+  const char *getName() const {
+    return _name.c_str();
   }
 
   int getTaskId() const {

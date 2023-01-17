@@ -105,7 +105,7 @@ bool FreeRTOSTask::start() {
   if (taskStarted) {
     return false;
   } else {
-    xTaskCreateUniversal(this->taskWrap, getName().c_str(), _stackDepth, this, _priority, &handle, _coreId);
+    xTaskCreateUniversal(this->taskWrap, getName(), _stackDepth, this, _priority, &handle, _coreId);
     return true;
   }
 }
