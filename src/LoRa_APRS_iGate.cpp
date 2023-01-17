@@ -37,9 +37,8 @@ TaskQueue<std::shared_ptr<APRSMessage>> toMQTT;
 System        LoRaSystem;
 Configuration userConfig;
 
-DisplayTask *displayTask;
-// ModemTask   modemTask(fromModem, toModem);
-RadiolibTask      modemTask(fromModem, toModem);
+DisplayTask      *displayTask;
+RadiolibTask     *modemTask;
 EthTask          *ethTask;
 WifiTask         *wifiTask;
 OTATask          *otaTask;
@@ -150,7 +149,10 @@ void setup() {
   LoRaSystem.setUserConfig(&userConfig);
   displayTask = new DisplayTask(1, 0, LoRaSystem);
   LoRaSystem.getTaskManager().addFreeRTOSTask(displayTask);
-  LoRaSystem.getTaskManager().addTask(&modemTask);
+
+  modemTask = new RadiolibTask(5, 0, LoRaSystem, fromModem, toModem);
+  LoRaSystem.getTaskManager().addFreeRTOSTask(modemTask);
+
   LoRaSystem.getTaskManager().addTask(&routerTask);
   beaconTask = new BeaconTask(3, 0, LoRaSystem, toModem, toAprsIs);
   LoRaSystem.getTaskManager().addFreeRTOSTask(beaconTask);

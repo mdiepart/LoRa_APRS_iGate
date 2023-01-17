@@ -6,17 +6,17 @@
 #include <RadioLib.h>
 #include <TaskManager.h>
 
-class RadiolibTask : public Task {
+class RadiolibTask : public FreeRTOSTask {
 public:
-  explicit RadiolibTask(TaskQueue<std::shared_ptr<APRSMessage>> &fromModem, TaskQueue<std::shared_ptr<APRSMessage>> &_toModem);
+  explicit RadiolibTask(UBaseType_t priority, BaseType_t coreId, System &system, TaskQueue<std::shared_ptr<APRSMessage>> &fromModem, TaskQueue<std::shared_ptr<APRSMessage>> &toModem);
   virtual ~RadiolibTask();
 
-  virtual bool setup(System &system) override;
-  virtual bool loop(System &system) override;
+  void worker() override;
 
 private:
   Module *module;
   SX1278 *radio;
+  System *_system;
 
   Configuration::LoRa config;
 
@@ -25,10 +25,6 @@ private:
   TaskQueue<std::shared_ptr<APRSMessage>> &_fromModem;
   TaskQueue<std::shared_ptr<APRSMessage>> &_toModem;
 
-  static volatile bool enableInterrupt; // Need to catch interrupt or not.
-  static volatile bool operationDone;   // Caught IRQ or not.
-
-  static void setFlag(void);
 
   int16_t startRX(uint8_t mode);
   int16_t startTX(String &str);
