@@ -120,14 +120,14 @@ private:
 
 class StatusFrame : public DisplayFrame {
 public:
-  explicit StatusFrame(const std::list<Task *> &tasks) : _tasks(tasks) {
+  explicit StatusFrame(const std::list<FreeRTOSTask *> &tasks) : _tasks(tasks) {
   }
   virtual ~StatusFrame() {
   }
   void drawStatusPage(Bitmap &bitmap) override;
 
 private:
-  std::list<Task *> _tasks;
+  std::list<FreeRTOSTask *> _tasks;
 };
 
 #include "System.h"

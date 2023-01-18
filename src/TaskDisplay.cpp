@@ -18,7 +18,7 @@ void DisplayTask::worker() {
     _system->getDisplay().turn180();
   }
 
-  std::shared_ptr<StatusFrame> statusFrame = std::shared_ptr<StatusFrame>(new StatusFrame(_system->getTaskManager().getTasks()));
+  std::shared_ptr<StatusFrame> statusFrame = std::shared_ptr<StatusFrame>(new StatusFrame(_system->getTaskManager().getFreeRTOSTasks()));
   _system->getDisplay().setStatusFrame(statusFrame);
 
   if (!_system->getUserConfig()->display.alwaysOn) {
