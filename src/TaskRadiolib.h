@@ -25,7 +25,6 @@ private:
   TaskQueue<std::shared_ptr<APRSMessage>> &_fromModem;
   TaskQueue<std::shared_ptr<APRSMessage>> &_toModem;
 
-
   int16_t startRX(uint8_t mode);
   int16_t startTX(String &str);
 
