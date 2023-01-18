@@ -14,6 +14,7 @@ DisplayTask::~DisplayTask() {
 }
 
 void DisplayTask::worker() {
+  vTaskDelay(pdMS_TO_TICKS(100));
   if (_system->getUserConfig()->display.turn180) {
     _system->getDisplay().turn180();
   }
