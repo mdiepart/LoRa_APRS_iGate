@@ -47,8 +47,11 @@ void WifiTask::worker() {
         _state         = Error;
         _stateInfo     = "Not connected";
         _system->connectedViaWifi(false);
+        WiFi.disconnect();
+        vTaskDelay(pdMS_TO_TICKS(1000));
+        WiFi.setAutoReconnect(true);
       }
-      vTaskDelay(1000 / portTICK_PERIOD_MS);
+      vTaskDelay(1500 / portTICK_PERIOD_MS);
     }
   }
 }
