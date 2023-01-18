@@ -245,4 +245,5 @@ void loop() {
     APP_LOGI(MODULE_NAME, "System connected after a restart to the network, syslog server set");
     syslogSet = true;
   }
+  vTaskDelay(pdMS_TO_TICKS(2000));
 }
