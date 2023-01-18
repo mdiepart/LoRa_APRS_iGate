@@ -47,7 +47,7 @@ FTPTask          *ftpTask;
 MQTTTask         *mqttTask;
 WebTask          *webTask;
 AprsIsTask       *aprsIsTask;
-RouterTask        routerTask(fromModem, toModem, toAprsIs, toMQTT);
+RouterTask       *routerTask;
 BeaconTask       *beaconTask;
 PacketLoggerTask *packetLoggerTask;
 
@@ -152,8 +152,8 @@ void setup() {
 
   modemTask = new RadiolibTask(5, 0, LoRaSystem, fromModem, toModem);
   LoRaSystem.getTaskManager().addFreeRTOSTask(modemTask);
-
-  LoRaSystem.getTaskManager().addTask(&routerTask);
+  routerTask = new RouterTask(4, 0, LoRaSystem, fromModem, toModem, toAprsIs, toMQTT);
+  LoRaSystem.getTaskManager().addFreeRTOSTask(routerTask);
   beaconTask = new BeaconTask(3, 0, LoRaSystem, toModem, toAprsIs);
   LoRaSystem.getTaskManager().addFreeRTOSTask(beaconTask);
 
@@ -239,7 +239,7 @@ volatile bool syslogSet = false;
 
 void loop() {
   esp_task_wdt_reset();
-  LoRaSystem.getTaskManager().loop(LoRaSystem);
+  // LoRaSystem.getTaskManager().loop(LoRaSystem);
   if (LoRaSystem.isWifiOrEthConnected() && LoRaSystem.getUserConfig()->syslog.active && !syslogSet) {
     logger.setSyslogServer(LoRaSystem.getUserConfig()->syslog.server, LoRaSystem.getUserConfig()->syslog.port, LoRaSystem.getUserConfig()->callsign);
     APP_LOGI(MODULE_NAME, "System connected after a restart to the network, syslog server set");
