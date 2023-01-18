@@ -11,13 +11,16 @@
 #include "TaskWeb.h"
 #include "project_configuration.h"
 
-WebTask::WebTask() : Task(TASK_WEB, TaskWeb), http_server(80) {
+WebTask::WebTask(UBaseType_t priority, BaseType_t coreId, System &system) : FreeRTOSTask(TASK_WEB, TaskWeb, priority, 8192, coreId), http_server(80) {
+  _system = &system;
+  start();
 }
 
 WebTask::~WebTask() {
+  http_server.close();
 }
 
-bool WebTask::setup(System &system) {
+void WebTask::worker() {
   Webserver = webserver();
   {
     using namespace std::placeholders;
@@ -46,53 +49,55 @@ bool WebTask::setup(System &system) {
 
   isServerStarted = false;
   _stateInfo      = "Awaiting network";
-  return true;
-}
 
-bool WebTask::loop(System &system) {
-  if (isServerStarted && !system.isWifiOrEthConnected()) {
-    http_server.close();
-    isServerStarted = false;
-    APP_LOGW(getName(), "Closed HTTP server because network connection was lost.");
-    _stateInfo = "Awaiting network";
+  while (!_system->isWifiOrEthConnected()) {
+    vTaskDelay(pdMS_TO_TICKS(1000));
   }
+  for (;;) {
+    if (isServerStarted && !_system->isWifiOrEthConnected()) {
+      http_server.close();
+      isServerStarted = false;
+      APP_LOGW(getName(), "Closed HTTP server because network connection was lost.");
+      _stateInfo = "Awaiting network";
+    }
 
-  if (!isServerStarted && system.isWifiOrEthConnected()) {
-    http_server.begin();
-    isServerStarted = true;
-    APP_LOGW(getName(), "Network connection recovered, http server restarted.");
-    _stateInfo = "Online";
-  }
+    if (!isServerStarted && _system->isWifiOrEthConnected()) {
+      http_server.begin();
+      isServerStarted = true;
+      APP_LOGW(getName(), "Network connection recovered, http server restarted.");
+      _stateInfo = "Online";
+    }
 
-  // Check for too old client sessions every 10s
-  static uint32_t timeSinceRefresh = 0;
-  if (millis() - timeSinceRefresh >= 10000) {
-    for (auto client : connected_clients) {
-      if (millis() - client.second.timestamp > SESSION_LIFETIME) {
-        connected_clients.erase(client.first);
+    // Check for too old client sessions every 10s
+    static uint32_t timeSinceRefresh = 0;
+    if (millis() - timeSinceRefresh >= 10000) {
+      for (auto client : connected_clients) {
+        if (millis() - client.second.timestamp > SESSION_LIFETIME) {
+          connected_clients.erase(client.first);
+        }
       }
     }
+
+    if (!isServerStarted) {
+      vTaskDelay(pdMS_TO_TICKS(1000));
+      continue;
+    }
+
+    // Check if we have a client available and serve it
+    WiFiClient client = http_server.available();
+
+    if (client) {
+      client.setTimeout(TIMEOUT);
+      APP_LOGI(getName(), "new client with IP %s.", client.localIP().toString().c_str());
+
+      Webserver.serve(client, *_system);
+
+      // Close the connection
+      client.stop();
+    }
+
+    vTaskDelay(pdMS_TO_TICKS(100));
   }
-
-  if (!isServerStarted) {
-    return true;
-  }
-
-  // Check if we have a client available and serve it
-  WiFiClient client = http_server.available();
-
-  if (client) {
-    client.setTimeout(TIMEOUT);
-    APP_LOGI(getName(), "new client with IP %s.", client.localIP().toString().c_str());
-
-    Webserver.serve(client, system);
-
-    // Close the connection
-    // client.flush();
-    client.stop();
-  }
-
-  return true;
 }
 
 String WebTask::loadPage(String file) {

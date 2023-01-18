@@ -6,13 +6,12 @@
 #include <WiFiMulti.h>
 #include <map>
 
-class WebTask : public Task {
+class WebTask : public FreeRTOSTask {
 public:
-  WebTask();
+  WebTask(UBaseType_t priority, BaseType_t coreId, System &system);
   virtual ~WebTask();
 
-  virtual bool setup(System &system) override;
-  virtual bool loop(System &system) override;
+  void worker() override;
 
 private:
   struct session_cookie {
@@ -25,7 +24,8 @@ private:
 
   WiFiServer http_server;
   webserver  Webserver;
-  // System    *system;
+  System    *_system;
+
   bool               isServerStarted  = false;
   const unsigned int TIMEOUT          = 5;      // Timeout in s
   const unsigned int SESSION_LIFETIME = 900000; // user session lifetime in ms (900 000 is 15 minutes)
