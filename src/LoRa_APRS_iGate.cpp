@@ -239,7 +239,6 @@ void setup() {
     pinMode(userConfig.display.overwritePin, INPUT_PULLUP);
   }
 
-  delay(5000);
   APP_LOGI(MODULE_NAME, "setup done...");
 }
 
