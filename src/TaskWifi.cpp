@@ -31,6 +31,8 @@ void WifiTask::worker() {
     _wiFiMulti.addAP(ap.SSID.c_str(), ap.password.c_str());
   }
 
+  uint32_t timeDisconnected = millis();
+
   for (;;) {
     uint8_t wifi_status = _wiFiMulti.run();
     if (wifi_status == WL_CONNECTED) {
@@ -41,15 +43,42 @@ void WifiTask::worker() {
       }
       vTaskDelay(5000 / portTICK_PERIOD_MS);
     } else {
+      if (_oldWifiStatus == WL_CONNECTED) {
+        timeDisconnected = millis();
+      }
       if (_oldWifiStatus != wifi_status) {
         _oldWifiStatus = wifi_status;
         _state         = Error;
         _stateInfo     = "Not connected";
         _system.connectedViaWifi(false);
-        WiFi.disconnect();
-        vTaskDelay(pdMS_TO_TICKS(1000));
-        WiFi.setAutoReconnect(true);
+        switch (wifi_status) {
+        case WL_DISCONNECTED:
+          APP_LOGD(getName(), "WiFi disconnected.");
+          break;
+        case WL_CONNECTION_LOST:
+          APP_LOGD(getName(), "Connection lost.");
+          break;
+        case WL_IDLE_STATUS:
+          APP_LOGD(getName(), "Idle.");
+          break;
+        case WL_NO_SSID_AVAIL:
+          APP_LOGD(getName(), "No SSID available.");
+          break;
+        case WL_SCAN_COMPLETED:
+          APP_LOGD(getName(), "Scan completed.");
+          break;
+        case WL_CONNECT_FAILED:
+          APP_LOGD(getName(), "Connect failed");
+          break;
+        default:
+          APP_LOGD(getName(), "Status %d.", wifi_status);
+        }
+        /* If we are disconnected for more than 1 minute, restart the module */
+        if (!_system.isWifiOrEthConnected() && (millis() - timeDisconnected > 60000)) {
+          ESP.restart();
+        }
       }
+
       vTaskDelay(1500 / portTICK_PERIOD_MS);
     }
   }
