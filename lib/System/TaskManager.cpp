@@ -7,53 +7,12 @@
 TaskManager::TaskManager() {
 }
 
-void TaskManager::addTask(Task *task) {
-  _tasks.push_back(task);
-}
-
-void TaskManager::addAlwaysRunTask(Task *task) {
-  _alwaysRunTasks.push_back(task);
-}
-
 void TaskManager::addFreeRTOSTask(FreeRTOSTask *task) {
   _FreeRTOSTasks.push_back(task);
 }
 
-std::list<Task *> TaskManager::getTasks() {
-  std::list<Task *> tasks = _alwaysRunTasks;
-  std::copy(_tasks.begin(), _tasks.end(), std::back_inserter(tasks));
-  return tasks;
-}
-
 std::list<FreeRTOSTask *> TaskManager::getFreeRTOSTasks() {
   return _FreeRTOSTasks;
-}
-
-bool TaskManager::setup(System &system) {
-  APP_LOGI(MODULE_NAME, "will setup all tasks...");
-  for (Task *elem : _alwaysRunTasks) {
-    APP_LOGD(MODULE_NAME, "call setup for %s", elem->getName());
-    elem->setup(system);
-  }
-  for (Task *elem : _tasks) {
-    APP_LOGD(MODULE_NAME, "call setup for %s", elem->getName());
-    elem->setup(system);
-  }
-  _nextTask = _tasks.begin();
-  return true;
-}
-
-bool TaskManager::loop(System &system) {
-  for (Task *elem : _alwaysRunTasks) {
-    elem->loop(system);
-  }
-
-  if (_nextTask == _tasks.end()) {
-    _nextTask = _tasks.begin();
-  }
-  bool ret = (*_nextTask)->loop(system);
-  ++_nextTask;
-  return ret;
 }
 
 // cppcheck-suppress unusedFunction

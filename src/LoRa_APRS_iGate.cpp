@@ -204,7 +204,6 @@ void setup() {
   }
 
   esp_task_wdt_reset();
-  LoRaSystem.getTaskManager().setup(LoRaSystem);
 
   if (tcpip) {
     ntpTask = new NTPTask(5, 0, LoRaSystem);
@@ -239,11 +238,12 @@ volatile bool syslogSet = false;
 
 void loop() {
   esp_task_wdt_reset();
-  // LoRaSystem.getTaskManager().loop(LoRaSystem);
+
   if (LoRaSystem.isWifiOrEthConnected() && LoRaSystem.getUserConfig()->syslog.active && !syslogSet) {
     logger.setSyslogServer(LoRaSystem.getUserConfig()->syslog.server, LoRaSystem.getUserConfig()->syslog.port, LoRaSystem.getUserConfig()->callsign);
     APP_LOGI(MODULE_NAME, "System connected after a restart to the network, syslog server set");
     syslogSet = true;
   }
+
   vTaskDelay(pdMS_TO_TICKS(2000));
 }

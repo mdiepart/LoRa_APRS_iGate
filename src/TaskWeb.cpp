@@ -162,7 +162,7 @@ void WebTask::info_page(WiFiClient &client, webserver::Header_t &header, System 
 
   // Build $$TASKLIST$$ string
   String tasklist = "";
-  for (Task *task : system.getTaskManager().getTasks()) {
+  for (FreeRTOSTask *task : system.getTaskManager().getFreeRTOSTasks()) {
     switch (task->getTaskId()) {
     case TaskOta:
       switch (((OTATask *)task)->getOTAStatus()) {
@@ -204,23 +204,6 @@ void WebTask::info_page(WiFiClient &client, webserver::Header_t &header, System 
     }
   }
 
-  for (FreeRTOSTask *task : system.getTaskManager().getFreeRTOSTasks()) {
-    switch (task->getTaskId()) {
-    default:
-      switch (task->getState()) {
-      case TaskDisplayState::Okay:
-        tasklist += "<p class=\"task ok\">";
-        break;
-      case TaskDisplayState::Warning:
-        tasklist += "<p class=\"task warning\">";
-        break;
-      case TaskDisplayState::Error:
-        tasklist += "<p class=\"task error\">";
-        break;
-      }
-      tasklist += String(task->getName()) + ": " + task->getStateInfo() + "</p>";
-    }
-  }
   page.replace("$$TASKLIST$$", tasklist);
 
   String logs = system.getPacketLogger()->getTail();
