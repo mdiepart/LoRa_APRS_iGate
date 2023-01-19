@@ -2,8 +2,7 @@
 #include "System.h"
 #include "../../src/TaskPacketLogger.h"
 
-System::System() : _boardConfig(0), _userConfig(0), _isEthConnected(false), _isWifiConnected(false) {
-  _packetLogger = NULL;
+System::System() : _boardConfig(0), _userConfig(0), _taskManager(), _display(), _isEthConnected(false), _isWifiConnected(false), _packetLogger(NULL) {
 }
 
 System::~System() {

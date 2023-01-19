@@ -1,5 +1,3 @@
-#include <map>
-
 #include <APRS-IS.h>
 #include <BoardFinder.h>
 #include <System.h>

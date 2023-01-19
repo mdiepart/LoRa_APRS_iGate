@@ -22,9 +22,7 @@ static void radioCallback() {
   }
 }
 
-RadiolibTask::RadiolibTask(UBaseType_t priority, BaseType_t coreId, System &system, QueueHandle_t &fromModem, QueueHandle_t &toModem, QueueHandle_t &toPacketLogger) : FreeRTOSTask(TASK_RADIOLIB, TaskRadiolib, priority, 2560, coreId), _system(system), rxEnable(true), _fromModem(fromModem), _toModem(toModem), _toPacketLogger(toPacketLogger) {
-  config   = _system.getUserConfig()->lora;
-  txEnable = config.tx_enable;
+RadiolibTask::RadiolibTask(UBaseType_t priority, BaseType_t coreId, System &system, QueueHandle_t &fromModem, QueueHandle_t &toModem, QueueHandle_t &toPacketLogger) : FreeRTOSTask(TASK_RADIOLIB, TaskRadiolib, priority, 2560, coreId), module(NULL), radio(NULL), _system(system), config(system.getUserConfig()->lora), rxEnable(true), txEnable(config.tx_enable), _fromModem(fromModem), _toModem(toModem), _toPacketLogger(toPacketLogger) {
   start();
 }
 
@@ -137,8 +135,6 @@ void RadiolibTask::worker() {
   if (config.power > 17 && config.tx_enable) {
     radio->setCurrentLimit(140);
   }
-
-  preambleDurationMilliSec = ((uint64_t)(preambleLength + 4) << (config.spreadingFactor + 10 /* to milli-sec */)) / config.signalBandwidth;
 
   _stateInfo = "";
 

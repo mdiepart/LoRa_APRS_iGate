@@ -6,7 +6,7 @@
 #include "TaskWifi.h"
 #include "project_configuration.h"
 
-WifiTask::WifiTask(UBaseType_t priority, BaseType_t coreId, System &system) : FreeRTOSTask(TASK_WIFI, TaskWifi, priority, 2048 + 4096, coreId), _system(system) {
+WifiTask::WifiTask(UBaseType_t priority, BaseType_t coreId, System &system) : FreeRTOSTask(TASK_WIFI, TaskWifi, priority, 2048 + 4096, coreId), _system(system), _wiFiMulti(), _oldWifiStatus(WL_DISCONNECTED) {
   start();
 }
 

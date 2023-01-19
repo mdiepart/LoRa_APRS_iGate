@@ -7,16 +7,16 @@ logging::Logger logger;
 
 namespace logging {
 
-Logger::Logger() : _serial(&Serial), _level(LoggerLevel::LOG_DEBUG), _isSyslogSet(false) {
+Logger::Logger() : _serial(&Serial), _level(LoggerLevel::LOG_DEBUG), _isSyslogSet(false), _syslogUdp(), _syslogServer(), _syslogIp(), _syslogPort(514), _syslogHostname() {
 }
 
-Logger::Logger(LoggerLevel level) : _serial(&Serial), _level(level), _isSyslogSet(false) {
+Logger::Logger(LoggerLevel level) : _serial(&Serial), _level(level), _isSyslogSet(false), _syslogUdp(), _syslogServer(), _syslogIp(), _syslogPort(514), _syslogHostname() {
 }
 
-Logger::Logger(Stream *serial) : _serial(serial), _level(LoggerLevel::LOG_DEBUG), _isSyslogSet(false) {
+Logger::Logger(Stream *serial) : _serial(serial), _level(LoggerLevel::LOG_DEBUG), _isSyslogSet(false), _syslogUdp(), _syslogServer(), _syslogIp(), _syslogPort(514), _syslogHostname() {
 }
 
-Logger::Logger(Stream *serial, LoggerLevel level) : _serial(serial), _level(level), _isSyslogSet(false) {
+Logger::Logger(Stream *serial, LoggerLevel level) : _serial(serial), _level(level), _isSyslogSet(false), _syslogUdp(), _syslogServer(), _syslogIp(), _syslogPort(514), _syslogHostname() {
 }
 
 Logger::~Logger() {
@@ -117,28 +117,28 @@ void Logger::syslogLog(LoggerLevel level, const String &module, const String &te
 void Logger::debug(String name, const char *fmt, ...) {
   va_list args;
   va_start(args, fmt);
-  vlogf(logging::LoggerLevel::LOG_DEBUG, name, fmt, args);
+  vlogf(logging::LoggerLevel(logging::LoggerLevel::LOG_DEBUG), name, fmt, args);
   va_end(args);
 }
 
 void Logger::info(String name, const char *fmt, ...) {
   va_list args;
   va_start(args, fmt);
-  vlogf(logging::LoggerLevel::LOG_INFO, name, fmt, args);
+  vlogf(logging::LoggerLevel(logging::LoggerLevel::LOG_INFO), name, fmt, args);
   va_end(args);
 }
 
 void Logger::error(String name, const char *fmt, ...) {
   va_list args;
   va_start(args, fmt);
-  vlogf(logging::LoggerLevel::LOG_ERROR, name, fmt, args);
+  vlogf(logging::LoggerLevel(logging::LoggerLevel::LOG_ERROR), name, fmt, args);
   va_end(args);
 }
 
 void Logger::warn(String name, const char *fmt, ...) {
   va_list args;
   va_start(args, fmt);
-  vlogf(logging::LoggerLevel::LOG_WARN, name, fmt, args);
+  vlogf(logging::LoggerLevel(logging::LoggerLevel::LOG_WARN), name, fmt, args);
   va_end(args);
 }
 

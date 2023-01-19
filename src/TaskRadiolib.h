@@ -28,9 +28,6 @@ private:
 
   int16_t startRX(uint8_t mode);
   int16_t startTX(String &str);
-
-  uint32_t preambleDurationMilliSec;
-  Timer    txWaitTimer;
 };
 
 #endif

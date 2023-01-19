@@ -132,7 +132,7 @@ void PacketLoggerTask::worker() {
 
     int        lineLength;
     char      *line  = NULL;
-    const char fmt[] = "%d" /* counter */ SEPARATOR "%04d-%02d-%02dT%02d:%02d:%02dZ" /* timestamp*/ SEPARATOR                        //
+    const char fmt[] = "%u" /* counter */ SEPARATOR "%04d-%02d-%02dT%02d:%02d:%02dZ" /* timestamp*/ SEPARATOR                        //
                        "%s" /* callsign */ SEPARATOR "%s" /* target */ SEPARATOR "%s" /* path */ SEPARATOR "%s" /* data */ SEPARATOR //
                        "%.1f" /* RSSI */ SEPARATOR "%.1f" /* SNR */ SEPARATOR "%.1f\n" /* freq_error */;
 
@@ -193,7 +193,7 @@ void PacketLoggerTask::rotate() {
   // Remove oldest file if it exists
   char target_file[32] = {0};
   char origin_file[32] = {0};
-  snprintf(origin_file, 32, "/%s.%d", _filename.c_str(), _nb_files - 1);
+  snprintf(origin_file, 32, "/%s.%u", _filename.c_str(), _nb_files - 1);
 
   if (SPIFFS.remove(origin_file) == ESP_OK) {
     APP_LOGD(getName(), "Deleted file %s.", origin_file);

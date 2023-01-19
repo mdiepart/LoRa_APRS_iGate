@@ -21,8 +21,8 @@ namespace logging {
 class Logger {
 public:
   Logger();
-  Logger(LoggerLevel level);
-  Logger(Stream *serial);
+  explicit Logger(LoggerLevel level);
+  explicit Logger(Stream *serial);
   Logger(Stream *serial, LoggerLevel level);
   ~Logger();
 

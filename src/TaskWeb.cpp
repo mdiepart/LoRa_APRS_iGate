@@ -164,7 +164,7 @@ void WebTask::info_page(WiFiClient &client, webserver::Header_t &header, System 
   for (FreeRTOSTask *task : system.getTaskManager().getFreeRTOSTasks()) {
     switch (task->getTaskId()) {
     case TaskOta:
-      switch (((OTATask *)task)->getOTAStatus()) {
+      switch (static_cast<OTATask *>(task)->getOTAStatus()) {
       case OTATask::Status::OTA_ForceDisabled:
         tasklist += String("<p class=\"task\">") + task->getName() + ": Disabled.</p>";
         break;
@@ -176,7 +176,7 @@ void WebTask::info_page(WiFiClient &client, webserver::Header_t &header, System 
         break;
       case OTATask::Status::OTA_Enabled:
         tasklist += String("<p class=\"task ok\">") + task->getName() + ": Enabled for ";
-        unsigned int seconds = ((OTATask *)task)->getTimeRemaining() / 1000;
+        unsigned int seconds = static_cast<OTATask *>(task)->getTimeRemaining() / 1000;
         tasklist += String(seconds) + " more seconds.</p>";
         break;
       }
@@ -232,10 +232,9 @@ void WebTask::enableota_page(WiFiClient &client, webserver::Header_t &header, Sy
 
   // Load page and replace placeholder
   String page = loadPage("/enableOTA.html");
-
   for (FreeRTOSTask *it : system.getTaskManager().getFreeRTOSTasks()) {
     if (it->getTaskId() == TaskOta) {
-      ((OTATask *)it)->enableOTA(5 * 60 * 1000); // Enabling OTA for 5 minutes
+      static_cast<OTATask *>(it)->enableOTA(5 * 60 * 1000); // Enabling OTA for 5 minutes
       APP_LOGI(getName(), "User enabled OTA for 5 minutes via web interface");
       page.replace("$$STATUS$$", "<p style=\"text-align: center; color: white;\">OTA Enabled for 5 minutes.</p>");
 
@@ -277,7 +276,6 @@ void WebTask::uploadfw_page(WiFiClient &client, webserver::Header_t &header, Sys
   uint8_t     *read_buffer                    = full_buffer + 2;
   full_buffer[1]                              = '\n'; // This char will always be '\n'
   int       len;
-  size_t    file_size = 0;
   String    name;
   String    filename;
   esp_err_t esp_error = ESP_OK;
@@ -287,11 +285,12 @@ void WebTask::uploadfw_page(WiFiClient &client, webserver::Header_t &header, Sys
   read_buffer[len - 1] = '\0'; // Replace '\r' by '\0'
   APP_LOGD("uploadFW", "boundary token = %s, buffer = %s.", boundary_token.c_str(), read_buffer);
   if (strcmp(boundary_token.c_str(), (const char *)read_buffer) == 0) { // We found a boundary token. It should be at the beginning of a form part
+    size_t file_size = 0;
     while (client.available() && esp_error == ESP_OK) {
-      String header = readCRLFCRLF(client); // Read the header that is just after the boundary
+      String headerStr = readCRLFCRLF(client); // Read the header that is just after the boundary
       // Determine field name
-      name     = header.substring(header.indexOf("name=\"") + strlen("name=\""), header.indexOf("\"; filename"));
-      filename = header.substring(header.indexOf("filename=\"") + strlen("filename=\""), header.indexOf("\"\r\n"));
+      name     = headerStr.substring(headerStr.indexOf("name=\"") + strlen("name=\""), headerStr.indexOf("\"; filename"));
+      filename = headerStr.substring(headerStr.indexOf("filename=\"") + strlen("filename=\""), headerStr.indexOf("\"\r\n"));
       APP_LOGD(getName(), "Section with name=\"%s\" and filename = \"%s\".", name.c_str(), filename.c_str());
 
       if (name.equals("Firmware_File")) {
@@ -530,14 +529,14 @@ void WebTask::login_page(WiFiClient &client, webserver::Header_t &header, System
       esp_fill_random(cookie_value, 64);
 
       // Transform random values to valid alphanumeric chars
-      for (size_t i = 0; i < 64; i++) {
-        uint8_t b = cookie_value[i] % 62;
+      for (size_t j = 0; j < 64; j++) {
+        uint8_t b = cookie_value[j] % 62;
         if (b < 10) {
-          cookie_value[i] = '0' + b;
+          cookie_value[j] = '0' + b;
         } else if (b < 36) {
-          cookie_value[i] = 'A' + b - 10;
+          cookie_value[j] = 'A' + b - 10;
         } else {
-          cookie_value[i] = 'a' + b - 36;
+          cookie_value[j] = 'a' + b - 36;
         }
       }
 

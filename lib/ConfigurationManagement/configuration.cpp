@@ -6,10 +6,10 @@
 
 ConfigurationManagement::ConfigurationManagement(String FilePath) : mFilePath(FilePath) {
   if (!SPIFFS.begin(true)) {
-    logger.log(logging::LoggerLevel::LOG_INFO, MODULE_NAME, "Mounting SPIFFS was not possible. Trying to format SPIFFS...");
+    APP_LOGD(MODULE_NAME, "Mounting SPIFFS was not possible. Trying to format SPIFFS...");
     SPIFFS.format();
     if (!SPIFFS.begin()) {
-      logger.log(logging::LoggerLevel::LOG_ERROR, MODULE_NAME, "Formatting SPIFFS was not okay!");
+      APP_LOGE(MODULE_NAME, "Formatting SPIFFS was not okay!");
     }
   }
 }

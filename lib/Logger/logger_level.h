@@ -38,7 +38,7 @@ public:
 
   LoggerLevel() = default;
 
-  constexpr LoggerLevel(Value aType) : _value(aType) {
+  explicit constexpr LoggerLevel(Value aType) : _value(aType) {
   }
   constexpr bool operator==(LoggerLevel a) const {
     return _value == a._value;
