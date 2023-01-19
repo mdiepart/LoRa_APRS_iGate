@@ -46,7 +46,7 @@ private:
   const String         HEADER     = String("NUMBER" SEPARATOR "TIMESTAMP" SEPARATOR "CALLSIGN" SEPARATOR "TARGET" SEPARATOR "PATH" SEPARATOR "DATA" SEPARATOR "RSSI" SEPARATOR "SNR" SEPARATOR "FREQ_ERROR");
   const size_t         QUEUE_SIZE = 5;
   std::queue<log_line> _log_queue;
-  System              *_system;
+  System              &_system;
 };
 
 #endif

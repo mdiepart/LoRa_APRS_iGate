@@ -7,8 +7,7 @@
 #include "TaskOTA.h"
 #include "project_configuration.h"
 
-OTATask::OTATask(UBaseType_t priority, BaseType_t coreId, System &system) : FreeRTOSTask(TASK_OTA, TaskOta, priority, 2048, coreId), _beginCalled(false) {
-  _system = &system;
+OTATask::OTATask(UBaseType_t priority, BaseType_t coreId, System &system) : FreeRTOSTask(TASK_OTA, TaskOta, priority, 2048, coreId), _beginCalled(false), _system(system) {
   start();
 }
 
@@ -43,22 +42,22 @@ void OTATask::worker() {
         }
         APP_LOGE(getName(), "Error[%d]: %s", error, error_str.c_str());
       });
-  if (_system->getUserConfig()->network.hostname.overwrite) {
-    _ota.setHostname(_system->getUserConfig()->network.hostname.name.c_str());
+  if (_system.getUserConfig()->network.hostname.overwrite) {
+    _ota.setHostname(_system.getUserConfig()->network.hostname.name.c_str());
   } else {
-    _ota.setHostname(_system->getUserConfig()->callsign.c_str());
+    _ota.setHostname(_system.getUserConfig()->callsign.c_str());
   }
 
-  if (!_system->getUserConfig()->ota.password.isEmpty()) {
-    _ota.setPassword(_system->getUserConfig()->ota.password.c_str());
-    APP_LOGI(getName(), "Set OTA password to %s", _system->getUserConfig()->ota.password.c_str());
+  if (!_system.getUserConfig()->ota.password.isEmpty()) {
+    _ota.setPassword(_system.getUserConfig()->ota.password.c_str());
+    APP_LOGI(getName(), "Set OTA password to %s", _system.getUserConfig()->ota.password.c_str());
   }
 
-  _ota.setPort((uint16_t)_system->getUserConfig()->ota.port);
-  APP_LOGI(getName(), "Set OTA port to %u", _system->getUserConfig()->ota.port);
+  _ota.setPort((uint16_t)_system.getUserConfig()->ota.port);
+  APP_LOGI(getName(), "Set OTA port to %u", _system.getUserConfig()->ota.port);
 
-  if (_system->getUserConfig()->ota.active) {
-    if (_system->getUserConfig()->ota.enableViaWeb) {
+  if (_system.getUserConfig()->ota.active) {
+    if (_system.getUserConfig()->ota.enableViaWeb) {
       _stateInfo = "Web";
       _status    = OTA_Disabled;
     } else {

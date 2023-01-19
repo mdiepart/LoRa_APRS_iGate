@@ -16,7 +16,7 @@ public:
 private:
   Module *module;
   SX1278 *radio;
-  System *_system;
+  System &_system;
 
   Configuration::LoRa config;
 

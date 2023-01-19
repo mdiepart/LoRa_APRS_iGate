@@ -11,7 +11,7 @@ public:
   void worker() override;
 
 private:
-  System   *_system;
+  System   &_system;
   WiFiMulti _wiFiMulti;
   uint8_t   _oldWifiStatus;
 };

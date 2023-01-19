@@ -64,8 +64,7 @@ void NetworkEvent(WiFiEvent_t event) {
   }
 }
 
-EthTask::EthTask(UBaseType_t priority, BaseType_t coreId, System &system) : FreeRTOSTask(TASK_ETH, TaskEth, priority, 2048, coreId) {
-  _system = &system;
+EthTask::EthTask(UBaseType_t priority, BaseType_t coreId, System &system) : FreeRTOSTask(TASK_ETH, TaskEth, priority, 2048, coreId), _system(system) {
   start();
 }
 
@@ -95,22 +94,22 @@ void EthTask::worker() {
 
   ETH.begin(ETH_ADDR, ETH_POWER_PIN, ETH_MDC_PIN, ETH_MDIO_PIN, ETH_TYPE, ETH_CLK);
 
-  if (!_system->getUserConfig()->network.DHCP) {
-    ETH.config(_system->getUserConfig()->network.static_.ip, _system->getUserConfig()->network.static_.gateway, _system->getUserConfig()->network.static_.subnet, _system->getUserConfig()->network.static_.dns1, _system->getUserConfig()->network.static_.dns2);
+  if (!_system.getUserConfig()->network.DHCP) {
+    ETH.config(_system.getUserConfig()->network.static_.ip, _system.getUserConfig()->network.static_.gateway, _system.getUserConfig()->network.static_.subnet, _system.getUserConfig()->network.static_.dns1, _system.getUserConfig()->network.static_.dns2);
   }
-  if (_system->getUserConfig()->network.hostname.overwrite) {
-    ETH.setHostname(_system->getUserConfig()->network.hostname.name.c_str());
+  if (_system.getUserConfig()->network.hostname.overwrite) {
+    ETH.setHostname(_system.getUserConfig()->network.hostname.name.c_str());
   } else {
-    ETH.setHostname(_system->getUserConfig()->callsign.c_str());
+    ETH.setHostname(_system.getUserConfig()->callsign.c_str());
   }
 
   for (;;) {
     if (!eth_connected) {
-      _system->connectedViaEth(false);
+      _system.connectedViaEth(false);
       _stateInfo = "Ethernet not connected";
       _state     = Error;
     } else {
-      _system->connectedViaEth(true);
+      _system.connectedViaEth(true);
       _stateInfo = ETH.localIP().toString();
       _state     = Okay;
     }

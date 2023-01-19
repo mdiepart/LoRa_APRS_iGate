@@ -24,7 +24,7 @@ private:
 
   WiFiServer http_server;
   webserver  Webserver;
-  System    *_system;
+  System    &_system;
 
   bool               isServerStarted  = false;
   const unsigned int TIMEOUT          = 5;      // Timeout in s

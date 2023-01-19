@@ -27,7 +27,7 @@ private:
   ArduinoOTAClass _ota;
   bool            _beginCalled;
   Status          _status;
-  System         *_system;
+  System         &_system;
 
   uint32_t _enable_time;
   uint32_t _timeout;

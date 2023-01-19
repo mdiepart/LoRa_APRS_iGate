@@ -11,8 +11,7 @@
 #include "TaskWeb.h"
 #include "project_configuration.h"
 
-WebTask::WebTask(UBaseType_t priority, BaseType_t coreId, System &system) : FreeRTOSTask(TASK_WEB, TaskWeb, priority, 8192, coreId), http_server(80) {
-  _system = &system;
+WebTask::WebTask(UBaseType_t priority, BaseType_t coreId, System &system) : FreeRTOSTask(TASK_WEB, TaskWeb, priority, 8192, coreId), http_server(80), _system(system) {
   start();
 }
 
@@ -50,18 +49,18 @@ void WebTask::worker() {
   isServerStarted = false;
   _stateInfo      = "Awaiting network";
 
-  while (!_system->isWifiOrEthConnected()) {
+  while (!_system.isWifiOrEthConnected()) {
     vTaskDelay(pdMS_TO_TICKS(1000));
   }
   for (;;) {
-    if (isServerStarted && !_system->isWifiOrEthConnected()) {
+    if (isServerStarted && !_system.isWifiOrEthConnected()) {
       http_server.close();
       isServerStarted = false;
       APP_LOGW(getName(), "Closed HTTP server because network connection was lost.");
       _stateInfo = "Awaiting network";
     }
 
-    if (!isServerStarted && _system->isWifiOrEthConnected()) {
+    if (!isServerStarted && _system.isWifiOrEthConnected()) {
       http_server.begin();
       isServerStarted = true;
       APP_LOGW(getName(), "Network connection recovered, http server restarted.");
@@ -90,7 +89,7 @@ void WebTask::worker() {
       client.setTimeout(TIMEOUT);
       APP_LOGI(getName(), "new client with IP %s.", client.localIP().toString().c_str());
 
-      Webserver.serve(client, *_system);
+      Webserver.serve(client, _system);
 
       // Close the connection
       client.stop();

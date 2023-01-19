@@ -13,7 +13,7 @@ public:
   void worker() override;
 
 private:
-  System        *_system;
+  System        &_system;
   WiFiClient     _client;
   QueueHandle_t &_toMQTT;
   PubSubClient   _MQTT;

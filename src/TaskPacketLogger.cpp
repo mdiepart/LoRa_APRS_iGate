@@ -10,19 +10,11 @@
 #include "TaskPacketLogger.h"
 #include "project_configuration.h"
 
-PacketLoggerTask::PacketLoggerTask(UBaseType_t priority, BaseType_t coreId, System &system, const String filename) : FreeRTOSTask(TASK_PACKET_LOGGER, TaskPacketLogger, priority, 3072, coreId) {
-  _nb_lines         = system.getUserConfig()->packetLogger.nb_lines;
-  _nb_files         = system.getUserConfig()->packetLogger.nb_files;
-  _counter          = 0;
-  _max_tail_length  = std::min<size_t>(system.getUserConfig()->packetLogger.tail_length, _nb_lines);
-  _curr_tail_length = 0;
-  _total_count      = 0;
-  _filename         = filename;
-  _tail             = "";
-  _log_queue        = std::queue<log_line>();
-
-  _system = &system;
-
+PacketLoggerTask::PacketLoggerTask(UBaseType_t priority, BaseType_t coreId, System &system, const String filename) : FreeRTOSTask(TASK_PACKET_LOGGER, TaskPacketLogger, priority, 3072, coreId), _counter(0), _curr_tail_length(0), _total_count(0), _filename(filename), _tail(""), _system(system) {
+  _nb_lines        = _system.getUserConfig()->packetLogger.nb_lines;
+  _nb_files        = _system.getUserConfig()->packetLogger.nb_files;
+  _max_tail_length = std::min<size_t>(system.getUserConfig()->packetLogger.tail_length, _nb_lines);
+  _log_queue       = std::queue<log_line>();
   start();
 }
 
@@ -30,7 +22,7 @@ PacketLoggerTask::~PacketLoggerTask() {
 }
 
 void PacketLoggerTask::worker() {
-  if (!_system->getUserConfig()->packetLogger.active || _filename == "" || _nb_lines == 0) {
+  if (!_system.getUserConfig()->packetLogger.active || _filename == "" || _nb_lines == 0) {
     APP_LOGE(getName(), "Could not enable packet logger.");
     _state     = Error;
     _stateInfo = "Disabled";

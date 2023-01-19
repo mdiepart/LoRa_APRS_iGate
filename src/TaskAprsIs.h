@@ -16,7 +16,7 @@ private:
   APRS_IS _aprs_is;
 
   QueueHandle_t &_toAprsIs;
-  System        *_system;
+  System        &_system;
   bool           connect();
 };
 

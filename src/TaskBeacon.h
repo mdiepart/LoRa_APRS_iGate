@@ -21,7 +21,7 @@ private:
   APRSMessage _beaconMsg;
   Timer       _beacon_timer;
 
-  System        *_system;
+  System        &_system;
   HardwareSerial _ss;
   TinyGPSPlus    _gps;
   bool           _useGps;

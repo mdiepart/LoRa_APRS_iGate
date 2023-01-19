@@ -6,8 +6,7 @@
 #include "TaskRouter.h"
 #include "project_configuration.h"
 
-RouterTask::RouterTask(UBaseType_t priority, BaseType_t coreId, System &system, QueueHandle_t &fromModem, QueueHandle_t &toModem, QueueHandle_t &toAprsIs, QueueHandle_t &toMQTT) : FreeRTOSTask(TASK_ROUTER, TaskRouter, priority, 2048, coreId), _fromModem(fromModem), _toModem(toModem), _toAprsIs(toAprsIs), _toMQTT(toMQTT) {
-  _system = &system;
+RouterTask::RouterTask(UBaseType_t priority, BaseType_t coreId, System &system, QueueHandle_t &fromModem, QueueHandle_t &toModem, QueueHandle_t &toAprsIs, QueueHandle_t &toMQTT) : FreeRTOSTask(TASK_ROUTER, TaskRouter, priority, 2048, coreId), _system(system), _fromModem(fromModem), _toModem(toModem), _toAprsIs(toAprsIs), _toMQTT(toMQTT) {
   start();
 }
 
@@ -20,12 +19,12 @@ void RouterTask::worker() {
       APRSMessage *fromModemMsg;
       xQueueReceive(_fromModem, &fromModemMsg, 0);
 
-      if (_system->getUserConfig()->mqtt.active) {
+      if (_system.getUserConfig()->mqtt.active) {
         APRSMessage *mqttMsg = new APRSMessage(*fromModemMsg);
         xQueueSendToBack(_toMQTT, &mqttMsg, pdMS_TO_TICKS(100));
       }
 
-      if (_system->getUserConfig()->aprs_is.active && fromModemMsg->getSource() != _system->getUserConfig()->callsign) {
+      if (_system.getUserConfig()->aprs_is.active && fromModemMsg->getSource() != _system.getUserConfig()->callsign) {
         APRSMessage *aprsIsMsg = new APRSMessage(*fromModemMsg);
         String       path      = aprsIsMsg->getPath();
 
@@ -34,7 +33,7 @@ void RouterTask::worker() {
             path += ",";
           }
 
-          aprsIsMsg->setPath(path + "qAO," + _system->getUserConfig()->callsign);
+          aprsIsMsg->setPath(path + "qAO," + _system.getUserConfig()->callsign);
 
           APP_LOGI(getName(), "APRS-IS: %s", aprsIsMsg->toString().c_str());
           xQueueSendToBack(_toAprsIs, &aprsIsMsg, pdMS_TO_TICKS(100));
@@ -42,24 +41,24 @@ void RouterTask::worker() {
           APP_LOGI(getName(), "APRS-IS: no forward => RFonly");
         }
       } else {
-        if (!_system->getUserConfig()->aprs_is.active) {
+        if (!_system.getUserConfig()->aprs_is.active) {
           APP_LOGI(getName(), "APRS-IS: disabled");
         }
 
-        if (fromModemMsg->getSource() == _system->getUserConfig()->callsign) {
+        if (fromModemMsg->getSource() == _system.getUserConfig()->callsign) {
           APP_LOGI(getName(), "APRS-IS: no forward => own packet received");
         }
       }
 
-      if (_system->getUserConfig()->digi.active && fromModemMsg->getSource() != _system->getUserConfig()->callsign) {
+      if (_system.getUserConfig()->digi.active && fromModemMsg->getSource() != _system.getUserConfig()->callsign) {
         APRSMessage *digiMsg = new APRSMessage(*fromModemMsg);
 
         String path = digiMsg->getPath();
 
         // simple loop check
-        if (path.indexOf("WIDE1-1") >= 0 && path.indexOf(_system->getUserConfig()->callsign) == -1) {
+        if (path.indexOf("WIDE1-1") >= 0 && path.indexOf(_system.getUserConfig()->callsign) == -1) {
           // fixme
-          digiMsg->setPath(_system->getUserConfig()->callsign + "*");
+          digiMsg->setPath(_system.getUserConfig()->callsign + "*");
 
           APP_LOGI(getName(), "DIGI: %s", digiMsg->toString().c_str());
 

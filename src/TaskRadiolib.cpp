@@ -22,10 +22,9 @@ static void radioCallback() {
   }
 }
 
-RadiolibTask::RadiolibTask(UBaseType_t priority, BaseType_t coreId, System &system, QueueHandle_t &fromModem, QueueHandle_t &toModem) : FreeRTOSTask(TASK_RADIOLIB, TaskRadiolib, priority, 2560, coreId), rxEnable(true), _fromModem(fromModem), _toModem(toModem) {
-  config   = _system->getUserConfig()->lora;
+RadiolibTask::RadiolibTask(UBaseType_t priority, BaseType_t coreId, System &system, QueueHandle_t &fromModem, QueueHandle_t &toModem) : FreeRTOSTask(TASK_RADIOLIB, TaskRadiolib, priority, 2560, coreId), _system(system), rxEnable(true), _fromModem(fromModem), _toModem(toModem) {
+  config   = _system.getUserConfig()->lora;
   txEnable = config.tx_enable;
-  _system  = &system;
   start();
 }
 
@@ -36,8 +35,8 @@ RadiolibTask::~RadiolibTask() {
 void RadiolibTask::worker() {
   // taskToNotify = handle;
   radioIRQSemaphore = xSemaphoreCreateBinary();
-  SPI.begin(_system->getBoardConfig()->LoraSck, _system->getBoardConfig()->LoraMiso, _system->getBoardConfig()->LoraMosi, _system->getBoardConfig()->LoraCS);
-  module = new Module(_system->getBoardConfig()->LoraCS, _system->getBoardConfig()->LoraIRQ, _system->getBoardConfig()->LoraReset);
+  SPI.begin(_system.getBoardConfig()->LoraSck, _system.getBoardConfig()->LoraMiso, _system.getBoardConfig()->LoraMosi, _system.getBoardConfig()->LoraCS);
+  module = new Module(_system.getBoardConfig()->LoraCS, _system.getBoardConfig()->LoraIRQ, _system.getBoardConfig()->LoraReset);
   radio  = new SX1278(module);
 
   float freqMHz = (float)config.frequencyRx / 1000000;
@@ -100,14 +99,14 @@ void RadiolibTask::worker() {
   taskENTER_CRITICAL(&mutex);
   xQueueReset(_toModem);
   UBaseType_t queueSetSize = 1; /* Queue size + 1 for the binary semaphore */
-  if (_system->getUserConfig()->lora.tx_enable) {
+  if (_system.getUserConfig()->lora.tx_enable) {
     queueSetSize += uxQueueSpacesAvailable(_toModem);
   }
 
   QueueSetHandle_t modemQueueSet = xQueueCreateSet(queueSetSize);
   bool             queueResult   = pdTRUE;
 
-  if (_system->getUserConfig()->lora.tx_enable) {
+  if (_system.getUserConfig()->lora.tx_enable) {
     queueResult &= xQueueAddToSet(_toModem, modemQueueSet);
   }
 
@@ -154,7 +153,7 @@ void RadiolibTask::worker() {
       if (state == RADIOLIB_ERR_CRC_MISMATCH) {
         // Log an error
         APP_LOGE(getName(), "[%s] Received corrupt packet (CRC check failed)", timeString().c_str());
-        _system->getPacketLogger()->logPacket("", "", "", "CRC error", radio->getRSSI(), radio->getSNR(), radio->getFrequencyError());
+        _system.getPacketLogger()->logPacket("", "", "", "CRC error", radio->getRSSI(), radio->getSNR(), radio->getFrequencyError());
       } else if (state != RADIOLIB_ERR_NONE) {
         APP_LOGE(getName(), "[%s] readData failed, code %d", timeString().c_str(), state);
       } else {
@@ -164,12 +163,12 @@ void RadiolibTask::worker() {
           APRSMessage *msg = new APRSMessage();
           msg->decode(str.substring(3));
           APP_LOGD(getName(), "[%s] Received packet '%s' with RSSI %.0fdBm, SNR %.2fdB and FreqErr %fHz", timeString().c_str(), msg->toString().c_str(), radio->getRSSI(), radio->getSNR(), -radio->getFrequencyError());
-          _system->getDisplay().addFrame(std::shared_ptr<DisplayFrame>(new TextFrame("LoRa", msg->toString().c_str())));
+          _system.getDisplay().addFrame(std::shared_ptr<DisplayFrame>(new TextFrame("LoRa", msg->toString().c_str())));
           TimeElements tm;
           breakTime(now(), tm);
           char timestamp[32];
           snprintf(timestamp, 31, "%04d-%02d-%02dT%02d:%02d:%02dZ", 1970 + tm.Year, tm.Month, tm.Day, tm.Hour, tm.Minute, tm.Second);
-          _system->getPacketLogger()->logPacket(msg->getSource(), msg->getDestination(), msg->getPath(), msg->getBody()->getData(), radio->getRSSI(), radio->getSNR(), radio->getFrequencyError());
+          _system.getPacketLogger()->logPacket(msg->getSource(), msg->getDestination(), msg->getPath(), msg->getBody()->getData(), radio->getRSSI(), radio->getSNR(), radio->getFrequencyError());
           xQueueSend(_fromModem, &msg, pdMS_TO_TICKS(100));
         }
       }

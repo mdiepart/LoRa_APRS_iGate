@@ -11,7 +11,7 @@ public:
   void worker() override;
 
 private:
-  System   *_system;
+  System   &_system;
   FTPServer _ftpServer;
 };
 

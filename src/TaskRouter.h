@@ -12,7 +12,7 @@ public:
   void worker() override;
 
 private:
-  System        *_system;
+  System        &_system;
   QueueHandle_t &_fromModem;
   QueueHandle_t &_toModem;
   QueueHandle_t &_toAprsIs;
