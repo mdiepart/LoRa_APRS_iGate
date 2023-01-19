@@ -8,8 +8,6 @@
 #include <queue>
 #include <stdio.h>
 
-#include "TimeLib.h"
-
 #define SEPARATOR "\t"
 
 class PacketLoggerTask : public FreeRTOSTask {
@@ -41,10 +39,10 @@ private:
 
 struct logEntry {
   logEntry();
-  logEntry(APRSMessage *msg, TimeElements tm, float rssi, float snr, float freq_error);
+  logEntry(APRSMessage *msg, time_t rxTime, float rssi, float snr, float freq_error);
 
   APRSMessage *msg;
-  TimeElements time;
+  time_t       rxTime;
   float        rssi;
   float        snr;
   float        freq_error;

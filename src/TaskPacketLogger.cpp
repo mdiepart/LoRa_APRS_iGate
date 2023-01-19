@@ -1,8 +1,8 @@
 #include <APRSMessage.h>
 #include <FS.h>
 #include <SPIFFS.h>
-#include <TimeLib.h>
 #include <WiFiMulti.h>
+#include <ctime>
 #include <logger.h>
 #include <queue>
 #include <string>
@@ -115,6 +115,9 @@ void PacketLoggerTask::worker() {
     // Wait untill we have an entry to add to log
     xQueueReceive(_toPacketLogger, &entry, portMAX_DELAY);
 
+    struct tm timeInfo;
+    localtime_r(&entry.rxTime, &timeInfo);
+
     if (_counter >= _nb_lines) {
       rotate();
       _counter = 0;
@@ -135,24 +138,24 @@ void PacketLoggerTask::worker() {
 
     /* Create line buffer */
     if (entry.msg == NULL) {
-      lineLength = snprintf(nullptr, 0, fmt, _counter, 1970 + entry.time.Year, entry.time.Month, entry.time.Day, entry.time.Hour, entry.time.Minute, entry.time.Second, //
+      lineLength = snprintf(nullptr, 0, fmt, _counter, timeInfo.tm_year, timeInfo.tm_mon, timeInfo.tm_mday, timeInfo.tm_hour, timeInfo.tm_min, timeInfo.tm_sec, //
                             " ", " ", " ", "INVALID PACKET", entry.rssi, entry.snr, entry.freq_error);
       if (lineLength > 0) {
         line = new char[lineLength + 1];
         if (line != NULL) {
-          snprintf(line, lineLength + 1, fmt, _counter, 1970 + entry.time.Year, entry.time.Month, entry.time.Day, entry.time.Hour, entry.time.Minute, entry.time.Second, //
+          snprintf(line, lineLength + 1, fmt, _counter, timeInfo.tm_year, timeInfo.tm_mon, timeInfo.tm_mday, timeInfo.tm_hour, timeInfo.tm_min, timeInfo.tm_sec, //
                    " ", " ", " ", "INVALID PACKET", entry.rssi, entry.snr, entry.freq_error);
         }
       }
     } else {
-      lineLength = snprintf(nullptr, 0, fmt, _counter, 1970 + entry.time.Year, entry.time.Month, entry.time.Day, entry.time.Hour, entry.time.Minute, entry.time.Second, //
-                            entry.msg->getSource().c_str(), entry.msg->getDestination().c_str(), entry.msg->getPath().c_str(), entry.msg->getRawBody().c_str(),         //
+      lineLength = snprintf(nullptr, 0, fmt, _counter, timeInfo.tm_year, timeInfo.tm_mon, timeInfo.tm_mday, timeInfo.tm_hour, timeInfo.tm_min, timeInfo.tm_sec, //
+                            entry.msg->getSource().c_str(), entry.msg->getDestination().c_str(), entry.msg->getPath().c_str(), entry.msg->getRawBody().c_str(), //
                             entry.rssi, entry.snr, entry.freq_error);
       if (lineLength > 0) {
         line = new char[lineLength + 1];
         if (line != NULL) {
-          snprintf(line, lineLength + 1, fmt, _counter, 1970 + entry.time.Year, entry.time.Month, entry.time.Day, entry.time.Hour, entry.time.Minute, entry.time.Second, //
-                   entry.msg->getSource().c_str(), entry.msg->getDestination().c_str(), entry.msg->getPath().c_str(), entry.msg->getRawBody().c_str(),                   //
+          snprintf(line, lineLength + 1, fmt, _counter, timeInfo.tm_year, timeInfo.tm_mon, timeInfo.tm_mday, timeInfo.tm_hour, timeInfo.tm_min, timeInfo.tm_sec, //
+                   entry.msg->getSource().c_str(), entry.msg->getDestination().c_str(), entry.msg->getPath().c_str(), entry.msg->getRawBody().c_str(),           //
                    entry.rssi, entry.snr, entry.freq_error);
         }
       }
@@ -292,8 +295,8 @@ bool PacketLoggerTask::getFullLogs(WiFiClient &client) {
   return true;
 }
 
-logEntry::logEntry() : msg(NULL), time(), rssi(0), snr(0), freq_error(0) {
+logEntry::logEntry() : msg(NULL), rxTime(0), rssi(0), snr(0), freq_error(0) {
 }
 
-logEntry::logEntry(APRSMessage *msg, TimeElements tm, float rssi, float snr, float freq_error) : msg(msg), time(tm), rssi(rssi), snr(snr), freq_error(freq_error) {
+logEntry::logEntry(APRSMessage *msg, time_t rxTime, float rssi, float snr, float freq_error) : msg(msg), rxTime(rxTime), rssi(rssi), snr(snr), freq_error(freq_error) {
 }

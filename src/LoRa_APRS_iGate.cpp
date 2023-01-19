@@ -4,6 +4,7 @@
 #include <BoardFinder.h>
 #include <System.h>
 #include <TaskManager.h>
+#include <esp_sntp.h>
 #include <esp_task_wdt.h>
 #include <logger.h>
 #include <power_management.h>
@@ -14,7 +15,6 @@
 #include "TaskEth.h"
 #include "TaskFTP.h"
 #include "TaskMQTT.h"
-#include "TaskNTP.h"
 #include "TaskOTA.h"
 #include "TaskPacketLogger.h"
 #include "TaskRadiolib.h"
@@ -43,7 +43,6 @@ RadiolibTask     *modemTask;
 EthTask          *ethTask;
 WifiTask         *wifiTask;
 OTATask          *otaTask;
-NTPTask          *ntpTask;
 FTPTask          *ftpTask;
 MQTTTask         *mqttTask;
 WebTask          *webTask;
@@ -51,6 +50,8 @@ AprsIsTask       *aprsIsTask;
 RouterTask       *routerTask;
 BeaconTask       *beaconTask;
 PacketLoggerTask *packetLoggerTask;
+
+void sntp_sync_callback_fn(timeval *timeVal);
 
 void setup() {
   esp_task_wdt_init(10, true);
@@ -213,8 +214,11 @@ void setup() {
   esp_task_wdt_reset();
 
   if (tcpip) {
-    ntpTask = new NTPTask(5, 0, LoRaSystem);
-    LoRaSystem.getTaskManager().addFreeRTOSTask(ntpTask);
+    sntp_set_sync_mode(SNTP_SYNC_MODE_IMMED);
+    sntp_set_sync_interval(3600 * 1000); // One hour
+    sntp_setservername(0, LoRaSystem.getUserConfig()->ntpServer.c_str());
+    sntp_set_time_sync_notification_cb(sntp_sync_callback_fn);
+    sntp_init();
   }
 
   LoRaSystem.getDisplay().showSpashScreen("LoRa APRS iGate", VERSION);
@@ -253,4 +257,13 @@ void loop() {
   }
 
   vTaskDelay(pdMS_TO_TICKS(2000));
+}
+
+void sntp_sync_callback_fn(timeval *timeVal) {
+  time_t     now = (time_t)timeVal->tv_sec;
+  char       strftime_buf[32];
+  struct tm *currentTime = localtime(&now);
+
+  strftime(strftime_buf, 32, "%c", currentTime);
+  APP_ISR_LOGI("SNTP", "SNTP set time to %s", strftime_buf);
 }

@@ -1,5 +1,6 @@
 #include <OneButton.h>
-#include <TimeLib.h>
+#include <ctime>
+#include <esp_sntp.h>
 #include <logger.h>
 
 #include "Task.h"
@@ -19,6 +20,11 @@ void BeaconTask::pushButton() {
 }
 
 void BeaconTask::worker() {
+  time_t    now;
+  struct tm timeInfo;
+  uint32_t  aprsSentTime = 0;
+  char      timeStr[9];
+
   if (_instances++ == 0 && _system.getBoardConfig()->Button > 0) {
     _userButton = OneButton(_system.getBoardConfig()->Button, true, true);
     _userButton.attachClick(pushButton);
@@ -41,8 +47,7 @@ void BeaconTask::worker() {
     }
   }
 
-  uint32_t aprsSentTime = 0;
-  while (!_system.isWifiOrEthConnected()) {
+  while (!_system.isWifiOrEthConnected() || (sntp_get_sync_status() == SNTP_SYNC_STATUS_RESET)) {
     vTaskDelay(1500 / portTICK_PERIOD_MS);
   }
 
@@ -65,7 +70,12 @@ void BeaconTask::worker() {
       if (_system.getUserConfig()->aprs_is.active && !_aprsBeaconSent) {
         APRSMessage *ipMsg = new APRSMessage(_beaconMsg);
         xQueueSendToBack(_toAprsIs, &ipMsg, pdMS_TO_TICKS(100));
-        APP_LOGI(getName(), "[IP Beacon][%s] %s", timeString().c_str(), _beaconMsg.encode().c_str());
+
+        time(&now);
+        localtime_r(&now, &timeInfo);
+        strftime(timeStr, 9, "%T", &timeInfo);
+        APP_LOGI(getName(), "[IP Beacon][%s] %s", timeStr, _beaconMsg.encode().c_str());
+
         aprsSentTime    = millis();
         _aprsBeaconSent = true;
         _system.getDisplay().addFrame(std::shared_ptr<DisplayFrame>(new TextFrame("IP BEACON", _beaconMsg.toString())));
@@ -78,7 +88,11 @@ void BeaconTask::worker() {
         if (millis() - aprsSentTime >= 30000) {
           APRSMessage *rfMsg = new APRSMessage(_beaconMsg);
           xQueueSendToBack(_toModem, &rfMsg, pdMS_TO_TICKS(100));
-          APP_LOGI(getName(), "[RF Beacon][%s] %s", timeString().c_str(), _beaconMsg.encode().c_str());
+
+          time(&now);
+          localtime_r(&now, &timeInfo);
+          strftime(timeStr, 9, "%T", &timeInfo);
+          APP_LOGI(getName(), "[RF Beacon][%s] %s", timeStr, _beaconMsg.encode().c_str());
           _system.getDisplay().addFrame(std::shared_ptr<DisplayFrame>(new TextFrame("RF BEACON", _beaconMsg.toString())));
           _beaconMsgReady = false;
         }
@@ -88,7 +102,7 @@ void BeaconTask::worker() {
     }
 
     uint32_t diff = _beacon_timer.getTriggerTimeInSec();
-    _stateInfo    = "beacon " + String(uint32_t(diff / 600)) + String(uint32_t(diff / 60) % 10) + ":" + String(uint32_t(diff / 10) % 6) + String(uint32_t(diff % 10));
+    _stateInfo    = "beacon " + String(uint32_t(diff / 60)) + ":" + String(uint32_t(diff) % 60);
 
     vTaskDelay(500 / portTICK_PERIOD_MS);
   }
