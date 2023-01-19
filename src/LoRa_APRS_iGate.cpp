@@ -29,10 +29,10 @@
 String create_lat_aprs(double lat);
 String create_long_aprs(double lng);
 
-TaskQueue<std::shared_ptr<APRSMessage>> toAprsIs;
-TaskQueue<std::shared_ptr<APRSMessage>> fromModem;
-TaskQueue<std::shared_ptr<APRSMessage>> toModem;
-TaskQueue<std::shared_ptr<APRSMessage>> toMQTT;
+QueueHandle_t toAprsIs;
+QueueHandle_t fromModem;
+QueueHandle_t toModem;
+QueueHandle_t toMQTT;
 
 System        LoRaSystem;
 Configuration userConfig;
@@ -144,6 +144,11 @@ void setup() {
       powerManagement.deactivateGPS();
     }
   }
+
+  toAprsIs  = xQueueCreate(10, sizeof(APRSMessage *));
+  toModem   = xQueueCreate(10, sizeof(APRSMessage *));
+  fromModem = xQueueCreate(10, sizeof(APRSMessage *));
+  toMQTT    = xQueueCreate(10, sizeof(APRSMessage *));
 
   LoRaSystem.setBoardConfig(boardConfig);
   LoRaSystem.setUserConfig(&userConfig);

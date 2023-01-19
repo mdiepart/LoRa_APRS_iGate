@@ -4,9 +4,8 @@
 #include "TaskAprsIs.h"
 #include "project_configuration.h"
 
-AprsIsTask::AprsIsTask(UBaseType_t priority, BaseType_t coreId, System &system, TaskQueue<std::shared_ptr<APRSMessage>> &toAprsIs) : FreeRTOSTask(TASK_APRS_IS, TaskAprsIs, priority, 2048, coreId) {
-  this->_system   = &system;
-  this->_toAprsIs = &toAprsIs;
+AprsIsTask::AprsIsTask(UBaseType_t priority, BaseType_t coreId, System &system, QueueHandle_t &toAprsIs) : FreeRTOSTask(TASK_APRS_IS, TaskAprsIs, priority, 2048, coreId), _toAprsIs(toAprsIs) {
+  _system = &system;
   start();
 }
 
@@ -38,9 +37,11 @@ void AprsIsTask::worker() {
 
     _aprs_is.getAPRSMessage();
 
-    if (!_toAprsIs->empty()) {
-      std::shared_ptr<APRSMessage> msg = _toAprsIs->getElement();
-      _aprs_is.sendMessage(msg);
+    if (uxQueueMessagesWaiting(_toAprsIs) > 0) {
+      APRSMessage *msg;
+      xQueueReceive(_toAprsIs, &msg, 0);
+      _aprs_is.sendMessage(msg->encode() + "\n");
+      delete msg;
     }
 
     vTaskDelay(1000);

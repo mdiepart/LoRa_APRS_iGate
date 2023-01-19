@@ -7,7 +7,7 @@
 
 class AprsIsTask : public FreeRTOSTask {
 public:
-  explicit AprsIsTask(UBaseType_t priority, BaseType_t coreId, System &system, TaskQueue<std::shared_ptr<APRSMessage>> &toAprsIs);
+  explicit AprsIsTask(UBaseType_t priority, BaseType_t coreId, System &system, QueueHandle_t &toAprsIs);
   virtual ~AprsIsTask();
 
   void worker() override;
@@ -15,9 +15,9 @@ public:
 private:
   APRS_IS _aprs_is;
 
-  TaskQueue<std::shared_ptr<APRSMessage>> *_toAprsIs;
-  System                                  *_system;
-  bool                                     connect();
+  QueueHandle_t &_toAprsIs;
+  System        *_system;
+  bool           connect();
 };
 
 #endif

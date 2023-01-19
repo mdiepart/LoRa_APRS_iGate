@@ -8,7 +8,7 @@
 
 class RadiolibTask : public FreeRTOSTask {
 public:
-  explicit RadiolibTask(UBaseType_t priority, BaseType_t coreId, System &system, TaskQueue<std::shared_ptr<APRSMessage>> &fromModem, TaskQueue<std::shared_ptr<APRSMessage>> &toModem);
+  explicit RadiolibTask(UBaseType_t priority, BaseType_t coreId, System &system, QueueHandle_t &fromModem, QueueHandle_t &toModem);
   virtual ~RadiolibTask();
 
   void worker() override;
@@ -22,8 +22,8 @@ private:
 
   bool rxEnable, txEnable;
 
-  TaskQueue<std::shared_ptr<APRSMessage>> &_fromModem;
-  TaskQueue<std::shared_ptr<APRSMessage>> &_toModem;
+  QueueHandle_t &_fromModem;
+  QueueHandle_t &_toModem;
 
   int16_t startRX(uint8_t mode);
   int16_t startTX(String &str);

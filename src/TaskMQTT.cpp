@@ -5,9 +5,8 @@
 #include "TaskMQTT.h"
 #include "project_configuration.h"
 
-MQTTTask::MQTTTask(UBaseType_t priority, BaseType_t coreId, System &system, TaskQueue<std::shared_ptr<APRSMessage>> &toMQTT) : FreeRTOSTask(TASK_MQTT, TaskMQTT, priority, 3072, coreId), _MQTT(_client) {
+MQTTTask::MQTTTask(UBaseType_t priority, BaseType_t coreId, System &system, QueueHandle_t &toMQTT) : FreeRTOSTask(TASK_MQTT, TaskMQTT, priority, 3072, coreId), _toMQTT(toMQTT), _MQTT(_client) {
   _system = &system;
-  _toMQTT = &toMQTT;
   start();
   APP_LOGI(getName(), "MQTT class created.");
 }
@@ -31,8 +30,9 @@ void MQTTTask::worker() {
       }
     }
 
-    if (!_toMQTT->empty()) {
-      std::shared_ptr<APRSMessage> msg = _toMQTT->getElement();
+    if (uxQueueMessagesWaiting(_toMQTT) > 0) {
+      APRSMessage *msg;
+      xQueueReceive(_toMQTT, &msg, pdMS_TO_TICKS(0));
 
       DynamicJsonDocument data(300);
       data["source"]      = msg->getSource();
@@ -53,8 +53,11 @@ void MQTTTask::worker() {
       topic = topic + _system->getUserConfig()->callsign;
       APP_LOGD(getName(), "Send MQTT with topic: '%s', data: %s", topic.c_str(), r.c_str());
       _MQTT.publish(topic.c_str(), r.c_str());
+      delete msg;
     }
 
     _MQTT.loop();
+
+    vTaskDelay(pdMS_TO_TICKS(1000));
   }
 }

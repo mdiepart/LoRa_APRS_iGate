@@ -10,16 +10,16 @@
 
 class BeaconTask : public FreeRTOSTask {
 public:
-  BeaconTask(UBaseType_t priority, BaseType_t coreId, System &system, TaskQueue<std::shared_ptr<APRSMessage>> &toModem, TaskQueue<std::shared_ptr<APRSMessage>> &toAprsIs);
+  BeaconTask(UBaseType_t priority, BaseType_t coreId, System &system, QueueHandle_t &toModem, QueueHandle_t &toAprsIs);
 
   void worker() override;
 
 private:
-  TaskQueue<std::shared_ptr<APRSMessage>> *_toModem;
-  TaskQueue<std::shared_ptr<APRSMessage>> *_toAprsIs;
+  QueueHandle_t &_toModem;
+  QueueHandle_t &_toAprsIs;
 
-  std::shared_ptr<APRSMessage> _beaconMsg;
-  Timer                        _beacon_timer;
+  APRSMessage _beaconMsg;
+  Timer       _beacon_timer;
 
   System        *_system;
   HardwareSerial _ss;

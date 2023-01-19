@@ -10,10 +10,8 @@ OneButton BeaconTask::_userButton;
 bool      BeaconTask::_send_update;
 uint      BeaconTask::_instances;
 
-BeaconTask::BeaconTask(UBaseType_t priority, BaseType_t coreId, System &system, TaskQueue<std::shared_ptr<APRSMessage>> &toModem, TaskQueue<std::shared_ptr<APRSMessage>> &toAprsIs) : FreeRTOSTask(TASK_BEACON, TaskBeacon, priority, 2048, coreId), _ss(1), _useGps(false), _beaconMsgReady(false), _aprsBeaconSent(false) {
-  _system   = &system;
-  _toModem  = &toModem;
-  _toAprsIs = &toAprsIs;
+BeaconTask::BeaconTask(UBaseType_t priority, BaseType_t coreId, System &system, QueueHandle_t &toModem, QueueHandle_t &toAprsIs) : FreeRTOSTask(TASK_BEACON, TaskBeacon, priority, 2048, coreId), _toModem(toModem), _toAprsIs(toAprsIs), _ss(1), _useGps(false), _beaconMsgReady(false), _aprsBeaconSent(false) {
+  _system = &system;
   start();
 }
 
@@ -28,10 +26,9 @@ void BeaconTask::worker() {
     _send_update = false;
   }
 
-  _useGps    = _system->getUserConfig()->beacon.use_gps;
-  _beaconMsg = std::shared_ptr<APRSMessage>(new APRSMessage());
-  _beaconMsg->setSource(_system->getUserConfig()->callsign);
-  _beaconMsg->setDestination("APLG01");
+  _useGps = _system->getUserConfig()->beacon.use_gps;
+  _beaconMsg.setSource(_system->getUserConfig()->callsign);
+  _beaconMsg.setDestination("APLG01");
   _beacon_timer.setTimeout(_system->getUserConfig()->beacon.timeout * 60 * 1000);
 
   if (_useGps) {
@@ -67,11 +64,12 @@ void BeaconTask::worker() {
 
     if (_beaconMsgReady) {
       if (_system->getUserConfig()->aprs_is.active && !_aprsBeaconSent) {
-        _toAprsIs->addElement(_beaconMsg);
-        APP_LOGI(getName(), "[IP Beacon][%s] %s", timeString().c_str(), _beaconMsg->encode().c_str());
+        APRSMessage *ipMsg = new APRSMessage(_beaconMsg);
+        xQueueSendToBack(_toAprsIs, &ipMsg, pdMS_TO_TICKS(100));
+        APP_LOGI(getName(), "[IP Beacon][%s] %s", timeString().c_str(), _beaconMsg.encode().c_str());
         aprsSentTime    = millis();
         _aprsBeaconSent = true;
-        _system->getDisplay().addFrame(std::shared_ptr<DisplayFrame>(new TextFrame("IP BEACON", _beaconMsg->toString())));
+        _system->getDisplay().addFrame(std::shared_ptr<DisplayFrame>(new TextFrame("IP BEACON", _beaconMsg.toString())));
       } else if (!_system->getUserConfig()->aprs_is.active) {
         aprsSentTime    = millis() - 30000;
         _aprsBeaconSent = true;
@@ -79,9 +77,10 @@ void BeaconTask::worker() {
 
       if (_system->getUserConfig()->digi.beacon) {
         if (millis() - aprsSentTime >= 30000) {
-          _toModem->addElement(_beaconMsg);
-          APP_LOGI(getName(), "[RF Beacon][%s] %s", timeString().c_str(), _beaconMsg->encode().c_str());
-          _system->getDisplay().addFrame(std::shared_ptr<DisplayFrame>(new TextFrame("RF BEACON", _beaconMsg->toString())));
+          APRSMessage *rfMsg = new APRSMessage(_beaconMsg);
+          xQueueSendToBack(_toModem, &rfMsg, pdMS_TO_TICKS(100));
+          APP_LOGI(getName(), "[RF Beacon][%s] %s", timeString().c_str(), _beaconMsg.encode().c_str());
+          _system->getDisplay().addFrame(std::shared_ptr<DisplayFrame>(new TextFrame("RF BEACON", _beaconMsg.toString())));
           _beaconMsgReady = false;
         }
       } else {
@@ -141,7 +140,7 @@ bool BeaconTask::buildBeaconMsg() {
 
   aprs_data += "& sT"; // No course, speed, range or compression type byte
 
-  _beaconMsg->getBody()->setData(aprs_data + _system->getUserConfig()->beacon.message);
+  _beaconMsg.getBody()->setData(aprs_data + _system->getUserConfig()->beacon.message);
 
   return true;
 }

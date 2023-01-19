@@ -8,15 +8,15 @@
 
 class MQTTTask : public FreeRTOSTask {
 public:
-  MQTTTask(UBaseType_t priority, BaseType_t coreId, System &system, TaskQueue<std::shared_ptr<APRSMessage>> &toMQTT);
+  MQTTTask(UBaseType_t priority, BaseType_t coreId, System &system, QueueHandle_t &toMQTT);
 
   void worker() override;
 
 private:
-  System                                  *_system;
-  WiFiClient                               _client;
-  TaskQueue<std::shared_ptr<APRSMessage>> *_toMQTT;
-  PubSubClient                             _MQTT;
+  System        *_system;
+  WiFiClient     _client;
+  QueueHandle_t &_toMQTT;
+  PubSubClient   _MQTT;
 };
 
 #endif
