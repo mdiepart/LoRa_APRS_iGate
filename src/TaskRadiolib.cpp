@@ -22,7 +22,7 @@ static void radioCallback() {
   }
 }
 
-RadiolibTask::RadiolibTask(UBaseType_t priority, BaseType_t coreId, System &system, QueueHandle_t &fromModem, QueueHandle_t &toModem) : FreeRTOSTask(TASK_RADIOLIB, TaskRadiolib, priority, 2560, coreId), _system(system), rxEnable(true), _fromModem(fromModem), _toModem(toModem) {
+RadiolibTask::RadiolibTask(UBaseType_t priority, BaseType_t coreId, System &system, QueueHandle_t &fromModem, QueueHandle_t &toModem, QueueHandle_t &toPacketLogger) : FreeRTOSTask(TASK_RADIOLIB, TaskRadiolib, priority, 2560, coreId), _system(system), rxEnable(true), _fromModem(fromModem), _toModem(toModem), _toPacketLogger(toPacketLogger) {
   config   = _system.getUserConfig()->lora;
   txEnable = config.tx_enable;
   start();
@@ -153,23 +153,29 @@ void RadiolibTask::worker() {
       if (state == RADIOLIB_ERR_CRC_MISMATCH) {
         // Log an error
         APP_LOGE(getName(), "[%s] Received corrupt packet (CRC check failed)", timeString().c_str());
-        _system.getPacketLogger()->logPacket("", "", "", "CRC error", radio->getRSSI(), radio->getSNR(), radio->getFrequencyError());
+        TimeElements tm;
+        breakTime(now(), tm);
+        logEntry entry(NULL, tm, radio->getRSSI(), radio->getSNR(), radio->getFrequencyError());
       } else if (state != RADIOLIB_ERR_NONE) {
         APP_LOGE(getName(), "[%s] readData failed, code %d", timeString().c_str(), state);
       } else {
         if (str.substring(0, 3) != "<\xff\x01") {
           APP_LOGD(getName(), "[%s] Unknown packet '%s' with RSSI %.0fdBm, SNR %.2fdB and FreqErr %fHz", timeString().c_str(), str.c_str(), radio->getRSSI(), radio->getSNR(), -radio->getFrequencyError());
         } else {
-          APRSMessage *msg = new APRSMessage();
-          msg->decode(str.substring(3));
-          APP_LOGD(getName(), "[%s] Received packet '%s' with RSSI %.0fdBm, SNR %.2fdB and FreqErr %fHz", timeString().c_str(), msg->toString().c_str(), radio->getRSSI(), radio->getSNR(), -radio->getFrequencyError());
-          _system.getDisplay().addFrame(std::shared_ptr<DisplayFrame>(new TextFrame("LoRa", msg->toString().c_str())));
+          APRSMessage *modemMsg = new APRSMessage();
+          modemMsg->decode(str.substring(3));
+
+          APRSMessage *loggerMsg = new APRSMessage(*modemMsg);
+
+          _system.getDisplay().addFrame(std::shared_ptr<DisplayFrame>(new TextFrame("LoRa", modemMsg->toString().c_str())));
+
           TimeElements tm;
           breakTime(now(), tm);
-          char timestamp[32];
-          snprintf(timestamp, 31, "%04d-%02d-%02dT%02d:%02d:%02dZ", 1970 + tm.Year, tm.Month, tm.Day, tm.Hour, tm.Minute, tm.Second);
-          _system.getPacketLogger()->logPacket(msg->getSource(), msg->getDestination(), msg->getPath(), msg->getBody()->getData(), radio->getRSSI(), radio->getSNR(), radio->getFrequencyError());
-          xQueueSend(_fromModem, &msg, pdMS_TO_TICKS(100));
+          logEntry log(loggerMsg, tm, radio->getRSSI(), radio->getSNR(), radio->getFrequencyError());
+
+          APP_LOGD(getName(), "[%s] Received packet '%s' with RSSI %.0fdBm, SNR %.2fdB and FreqErr %fHz", timeString().c_str(), modemMsg->toString().c_str(), radio->getRSSI(), radio->getSNR(), -radio->getFrequencyError());
+          xQueueSend(_fromModem, &modemMsg, pdMS_TO_TICKS(100));
+          xQueueSend(_toPacketLogger, &log, pdMS_TO_TICKS(100));
         }
       }
       if (rxEnable) {

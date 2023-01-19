@@ -8,7 +8,7 @@
 
 class RadiolibTask : public FreeRTOSTask {
 public:
-  explicit RadiolibTask(UBaseType_t priority, BaseType_t coreId, System &system, QueueHandle_t &fromModem, QueueHandle_t &toModem);
+  explicit RadiolibTask(UBaseType_t priority, BaseType_t coreId, System &system, QueueHandle_t &fromModem, QueueHandle_t &toModem, QueueHandle_t &toPacketLogger);
   virtual ~RadiolibTask();
 
   void worker() override;
@@ -24,6 +24,7 @@ private:
 
   QueueHandle_t &_fromModem;
   QueueHandle_t &_toModem;
+  QueueHandle_t &_toPacketLogger;
 
   int16_t startRX(uint8_t mode);
   int16_t startTX(String &str);

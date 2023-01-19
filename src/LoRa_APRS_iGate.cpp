@@ -33,6 +33,7 @@ QueueHandle_t toAprsIs;
 QueueHandle_t fromModem;
 QueueHandle_t toModem;
 QueueHandle_t toMQTT;
+QueueHandle_t toPacketLogger;
 
 System        LoRaSystem;
 Configuration userConfig;
@@ -145,17 +146,18 @@ void setup() {
     }
   }
 
-  toAprsIs  = xQueueCreate(10, sizeof(APRSMessage *));
-  toModem   = xQueueCreate(10, sizeof(APRSMessage *));
-  fromModem = xQueueCreate(10, sizeof(APRSMessage *));
-  toMQTT    = xQueueCreate(10, sizeof(APRSMessage *));
+  toAprsIs       = xQueueCreate(10, sizeof(APRSMessage *));
+  toModem        = xQueueCreate(10, sizeof(APRSMessage *));
+  fromModem      = xQueueCreate(10, sizeof(APRSMessage *));
+  toMQTT         = xQueueCreate(10, sizeof(APRSMessage *));
+  toPacketLogger = xQueueCreate(10, sizeof(logEntry));
 
   LoRaSystem.setBoardConfig(boardConfig);
   LoRaSystem.setUserConfig(&userConfig);
   displayTask = new DisplayTask(1, 0, LoRaSystem);
   LoRaSystem.getTaskManager().addFreeRTOSTask(displayTask);
 
-  modemTask = new RadiolibTask(5, 0, LoRaSystem, fromModem, toModem);
+  modemTask = new RadiolibTask(5, 0, LoRaSystem, fromModem, toModem, toPacketLogger);
   LoRaSystem.getTaskManager().addFreeRTOSTask(modemTask);
   routerTask = new RouterTask(4, 0, LoRaSystem, fromModem, toModem, toAprsIs, toMQTT);
   LoRaSystem.getTaskManager().addFreeRTOSTask(routerTask);
@@ -203,7 +205,7 @@ void setup() {
   }
 
   if (userConfig.packetLogger.active) {
-    packetLoggerTask = new PacketLoggerTask(2, 1, LoRaSystem, "packets.log");
+    packetLoggerTask = new PacketLoggerTask(2, 1, LoRaSystem, "packets.log", toPacketLogger);
     LoRaSystem.getTaskManager().addFreeRTOSTask(packetLoggerTask);
     LoRaSystem.setPacketLogger(packetLoggerTask);
   }

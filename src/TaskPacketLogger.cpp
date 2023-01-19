@@ -1,3 +1,4 @@
+#include <APRSMessage.h>
 #include <FS.h>
 #include <SPIFFS.h>
 #include <TimeLib.h>
@@ -10,11 +11,10 @@
 #include "TaskPacketLogger.h"
 #include "project_configuration.h"
 
-PacketLoggerTask::PacketLoggerTask(UBaseType_t priority, BaseType_t coreId, System &system, const String filename) : FreeRTOSTask(TASK_PACKET_LOGGER, TaskPacketLogger, priority, 3072, coreId), _counter(0), _curr_tail_length(0), _total_count(0), _filename(filename), _tail(""), _system(system) {
+PacketLoggerTask::PacketLoggerTask(UBaseType_t priority, BaseType_t coreId, System &system, const String filename, QueueHandle_t &toPacketLogger) : FreeRTOSTask(TASK_PACKET_LOGGER, TaskPacketLogger, priority, 3072, coreId), _counter(0), _curr_tail_length(0), _total_count(0), _filename(filename), _tail(""), _system(system), _toPacketLogger(toPacketLogger) {
   _nb_lines        = _system.getUserConfig()->packetLogger.nb_lines;
   _nb_files        = _system.getUserConfig()->packetLogger.nb_files;
   _max_tail_length = std::min<size_t>(system.getUserConfig()->packetLogger.tail_length, _nb_lines);
-  _log_queue       = std::queue<log_line>();
   start();
 }
 
@@ -110,68 +110,75 @@ void PacketLoggerTask::worker() {
     }
   }
   _stateInfo = "Running";
-
+  logEntry entry;
   for (;;) {
+    // Wait untill we have an entry to add to log
+    xQueueReceive(_toPacketLogger, &entry, portMAX_DELAY);
+
     if (_counter >= _nb_lines) {
       rotate();
       _counter = 0;
     }
-
-    if (!_log_queue.empty()) {
-      csv_file = SPIFFS.open("/" + _filename, "a");
-      if (!csv_file) {
-        APP_LOGE(getName(), "Could not open csv file to log packets...");
-        _stateInfo = "File error";
-        _state     = Error;
-        return;
-      }
-
-      while (!_log_queue.empty() && csv_file) {
-        log_line   line  = _log_queue.front();
-        const char fmt[] = "%d" SEPARATOR "%s" SEPARATOR "%s" SEPARATOR "%s" SEPARATOR "%s" SEPARATOR "%s" SEPARATOR "%.1f" SEPARATOR "%.1f" SEPARATOR "%.1f\n";
-        csv_file.printf(fmt, _counter, line.timestamp, line.callsign, line.target, line.path, line.data, line.RSSI, line.SNR, line.freq_error);
-        _log_queue.pop();
-        _counter++;
-        _total_count++;
-
-        if (_curr_tail_length >= _max_tail_length) {
-          _tail = _tail.substring(_tail.indexOf("\n") + 1);
-        } else {
-          _curr_tail_length++;
-        }
-        _tail += String(_counter) + SEPARATOR + line.timestamp + SEPARATOR + line.callsign + SEPARATOR + line.target + SEPARATOR + line.path;
-        _tail += SEPARATOR + String(line.data) + SEPARATOR + String(line.RSSI, 1) + SEPARATOR + String(line.SNR, 1) + SEPARATOR + String(line.freq_error, 1) + "\n";
-      }
-
-      _stateInfo = "Logged " + String(_total_count) + " packets since the device started";
-      csv_file.close();
+    csv_file = SPIFFS.open("/" + _filename, "a");
+    if (!csv_file) {
+      APP_LOGE(getName(), "Could not open csv file to log packets...");
+      _stateInfo = "File error";
+      _state     = Error;
+      return;
     }
 
-    vTaskDelay(1000 / portTICK_PERIOD_MS);
+    int        lineLength;
+    char      *line  = NULL;
+    const char fmt[] = "%d" /* counter */ SEPARATOR "%04d-%02d-%02dT%02d:%02d:%02dZ" /* timestamp*/ SEPARATOR                        //
+                       "%s" /* callsign */ SEPARATOR "%s" /* target */ SEPARATOR "%s" /* path */ SEPARATOR "%s" /* data */ SEPARATOR //
+                       "%.1f" /* RSSI */ SEPARATOR "%.1f" /* SNR */ SEPARATOR "%.1f\n" /* freq_error */;
+
+    /* Create line buffer */
+    if (entry.msg == NULL) {
+      lineLength = snprintf(nullptr, 0, fmt, _counter, 1970 + entry.time.Year, entry.time.Month, entry.time.Day, entry.time.Hour, entry.time.Minute, entry.time.Second, //
+                            " ", " ", " ", "INVALID PACKET", entry.rssi, entry.snr, entry.freq_error);
+      if (lineLength > 0) {
+        line = new char[lineLength + 1];
+        if (line != NULL) {
+          snprintf(line, lineLength + 1, fmt, _counter, 1970 + entry.time.Year, entry.time.Month, entry.time.Day, entry.time.Hour, entry.time.Minute, entry.time.Second, //
+                   " ", " ", " ", "INVALID PACKET", entry.rssi, entry.snr, entry.freq_error);
+        }
+      }
+    } else {
+      lineLength = snprintf(nullptr, 0, fmt, _counter, 1970 + entry.time.Year, entry.time.Month, entry.time.Day, entry.time.Hour, entry.time.Minute, entry.time.Second, //
+                            entry.msg->getSource().c_str(), entry.msg->getDestination().c_str(), entry.msg->getPath().c_str(), entry.msg->getRawBody().c_str(),         //
+                            entry.rssi, entry.snr, entry.freq_error);
+      if (lineLength > 0) {
+        line = new char[lineLength + 1];
+        if (line != NULL) {
+          snprintf(line, lineLength + 1, fmt, _counter, 1970 + entry.time.Year, entry.time.Month, entry.time.Day, entry.time.Hour, entry.time.Minute, entry.time.Second, //
+                   entry.msg->getSource().c_str(), entry.msg->getDestination().c_str(), entry.msg->getPath().c_str(), entry.msg->getRawBody().c_str(),                   //
+                   entry.rssi, entry.snr, entry.freq_error);
+        }
+      }
+    }
+
+    /* print the line to file and tail */
+    if (line != NULL) {
+      /* remove oldest line from _tail if it already is the max length */
+      if (_curr_tail_length >= _max_tail_length) {
+        _tail = _tail.substring(_tail.indexOf("\n") + 1);
+      } else {
+        _curr_tail_length++;
+      }
+      _tail += line;
+      csv_file.print(line);
+      delete line;
+    }
+
+    if (entry.msg != NULL) {
+      delete entry.msg;
+    }
+    csv_file.close();
+    _counter++;
+    _total_count++;
+    _stateInfo = "Logged " + String(_total_count) + " packets since the device started";
   }
-}
-
-void PacketLoggerTask::logPacket(const String &callsign, const String &target, const String &path, const String &data, float RSSI, float SNR, float frequency_error) {
-  // TODO check strings lengths
-  if (_log_queue.size() >= QUEUE_SIZE) {
-    return;
-  }
-
-  TimeElements tm;
-  breakTime(now(), tm);
-  char timestamp[32];
-  int  written = snprintf(timestamp, 31, "%04d-%02d-%02dT%02d:%02d:%02dZ", 1970 + tm.Year, tm.Month, tm.Day, tm.Hour, tm.Minute, tm.Second);
-
-  log_line line = {0};
-  strncpy(line.timestamp, timestamp, min<uint>(20, written));
-  strncpy(line.callsign, callsign.c_str(), min<uint>(9, callsign.length()));
-  strncpy(line.target, target.c_str(), min<uint>(6, target.length()));
-  strncpy(line.path, path.c_str(), min<uint>(19, path.length()));
-  strncpy(line.data, data.c_str(), min<uint>(253, data.length()));
-  line.RSSI       = RSSI;
-  line.SNR        = SNR;
-  line.freq_error = frequency_error;
-  _log_queue.push(line);
 }
 
 void PacketLoggerTask::rotate() {
@@ -283,4 +290,10 @@ bool PacketLoggerTask::getFullLogs(WiFiClient &client) {
   csv_file.close();
 
   return true;
+}
+
+logEntry::logEntry() : msg(NULL), time(), rssi(0), snr(0), freq_error(0) {
+}
+
+logEntry::logEntry(APRSMessage *msg, TimeElements tm, float rssi, float snr, float freq_error) : msg(msg), time(tm), rssi(rssi), snr(snr), freq_error(freq_error) {
 }
