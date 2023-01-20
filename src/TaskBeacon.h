@@ -21,12 +21,14 @@ private:
   APRSMessage _beaconMsg;
   Timer       _beacon_timer;
 
-  System        &_system;
-  HardwareSerial _ss;
-  TinyGPSPlus    _gps;
-  bool           _useGps;
-  bool           _beaconMsgReady;
-  bool           _aprsBeaconSent;
+  System                     &_system;
+  HardwareSerial              _ss;
+  TinyGPSPlus                 _gps;
+  bool                        _useGps;
+  TickType_t                  _lastBeaconSentTime;
+  const TickType_t            _beaconPeriod;
+  static constexpr TickType_t _fast_pace_timeout = pdMS_TO_TICKS(2000);
+  TickType_t                  _fast_pace_start_time;
 
   void onGpsSSReceive();
   bool buildBeaconMsg();
@@ -34,7 +36,9 @@ private:
   static uint      _instances;
   static OneButton _userButton;
   static bool      _send_update;
+  static bool      _fast_pace;
   static void      pushButton();
+  static void      startFastPace();
 };
 
 #endif
