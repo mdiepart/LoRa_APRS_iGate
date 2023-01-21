@@ -57,7 +57,7 @@ void BeaconTask::worker() {
       auto onReceiveFn = std::bind(std::mem_fn(&BeaconTask::onGpsSSReceive), this);
       _ss.onReceive(onReceiveFn);
     } else {
-      APP_LOGI(getName(), "NO GPS found.");
+      APP_LOGW(getName(), "NO GPS found.");
       _useGps = false;
     }
   }
@@ -77,6 +77,7 @@ void BeaconTask::worker() {
         _send_update = false;
         continue;
       }
+      _stateInfo          = "Sending...";
       _lastBeaconSentTime = xTaskGetTickCount();
       if (_system.getUserConfig()->aprs_is.active) {
         // Prepare APRS message to send to APRS-is
@@ -92,7 +93,6 @@ void BeaconTask::worker() {
 
         // Wait at least 30s before RF
         if (_system.getUserConfig()->digi.beacon) {
-          _stateInfo = "Waiting...";
           vTaskDelay(pdMS_TO_TICKS(30000));
         }
       }
@@ -122,10 +122,18 @@ void BeaconTask::worker() {
       continue;
     } else {
       TickType_t ticksLeft = _beaconPeriod - (xTaskGetTickCount() - _lastBeaconSentTime);
+      time(&now);
+      now += ((ticksLeft + 999) / 1000);
+      localtime_r(&now, &timeInfo);
+      strftime(timeStr, sizeof(timeStr), "%T", &timeInfo);
+      _stateInfo = String("Next @ ") + timeStr;
       if (xSemaphoreTake(buttonSemaphore, ticksLeft) == pdTRUE) {
         // Semaphore was obtained. That means that the button was pressed.
         _fast_pace            = true;
         _fast_pace_start_time = xTaskGetTickCount();
+      } else {
+        // Timed out, we need to send a beacon
+        _send_update = true;
       }
     }
   }

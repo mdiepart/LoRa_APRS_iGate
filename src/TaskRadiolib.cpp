@@ -153,7 +153,7 @@ void RadiolibTask::worker() {
 
       if (state == RADIOLIB_ERR_CRC_MISMATCH) {
         // Log an error
-        APP_LOGE(getName(), "[%s] Received corrupt packet (CRC check failed)", timeStr);
+        APP_LOGI(getName(), "[%s] Received corrupt packet (CRC check failed)", timeStr);
         logEntry entry(NULL, now, radio->getRSSI(), radio->getSNR(), radio->getFrequencyError());
       } else if (state != RADIOLIB_ERR_NONE) {
         APP_LOGE(getName(), "[%s] readData failed, code %d", timeStr, state);
@@ -170,7 +170,7 @@ void RadiolibTask::worker() {
 
           logEntry log(loggerMsg, now, radio->getRSSI(), radio->getSNR(), radio->getFrequencyError());
 
-          APP_LOGD(getName(), "[%s] Received packet '%s' with RSSI %.0fdBm, SNR %.2fdB and FreqErr %fHz", timeStr, modemMsg->toString().c_str(), radio->getRSSI(), radio->getSNR(), -radio->getFrequencyError());
+          APP_LOGI(getName(), "[%s] Received packet '%s' with RSSI %.0fdBm, SNR %.2fdB and FreqErr %fHz", timeStr, modemMsg->toString().c_str(), radio->getRSSI(), radio->getSNR(), -radio->getFrequencyError());
           xQueueSend(_fromModem, &modemMsg, pdMS_TO_TICKS(100));
           xQueueSend(_toPacketLogger, &log, pdMS_TO_TICKS(100));
         }
@@ -207,7 +207,7 @@ void RadiolibTask::worker() {
         } else if (transmissionState != RADIOLIB_ERR_NONE) {
           APP_LOGE(getName(), "[%s] transmitFlag failed, code %d", timeStr, transmissionState);
         } else {
-          APP_LOGD(getName(), "[%s] TX done", timeStr);
+          APP_LOGI(getName(), "[%s] TX done", timeStr);
         }
       }
 
