@@ -116,7 +116,7 @@ void PacketLoggerTask::worker() {
     xQueueReceive(_toPacketLogger, &entry, portMAX_DELAY);
 
     struct tm timeInfo;
-    localtime_r(&entry.rxTime, &timeInfo);
+    gmtime_r(&entry.rxTime, &timeInfo);
 
     if (_counter >= _nb_lines) {
       rotate();
@@ -130,32 +130,34 @@ void PacketLoggerTask::worker() {
       return;
     }
 
-    int        lineLength;
-    char      *line  = NULL;
-    const char fmt[] = "%u" /* counter */ SEPARATOR "%04d-%02d-%02dT%02d:%02d:%02dZ" /* timestamp*/ SEPARATOR                        //
-                       "%s" /* callsign */ SEPARATOR "%s" /* target */ SEPARATOR "%s" /* path */ SEPARATOR "%s" /* data */ SEPARATOR //
+    int   lineLength;
+    char *line = NULL;
+    char  timestamp[21];
+    strftime(timestamp, sizeof(timestamp), "%FT%TZ", &timeInfo);
+    const char fmt[] = "%u" /* counter */ SEPARATOR "%s" /* timestamp*/ SEPARATOR "%s" /* callsign */ SEPARATOR //
+                       "%s" /* target */ SEPARATOR "%s" /* path */ SEPARATOR "%s" /* data */ SEPARATOR          //
                        "%.1f" /* RSSI */ SEPARATOR "%.1f" /* SNR */ SEPARATOR "%.1f\n" /* freq_error */;
 
     /* Create line buffer */
     if (entry.msg == NULL) {
-      lineLength = snprintf(nullptr, 0, fmt, _counter, timeInfo.tm_year, timeInfo.tm_mon, timeInfo.tm_mday, timeInfo.tm_hour, timeInfo.tm_min, timeInfo.tm_sec, //
-                            " ", " ", " ", "INVALID PACKET", entry.rssi, entry.snr, entry.freq_error);
+      lineLength = snprintf(nullptr, 0, fmt, _counter, timestamp, " ", //
+                            " ", " ", "INVALID PACKET", entry.rssi, entry.snr, entry.freq_error);
       if (lineLength > 0) {
         line = new char[lineLength + 1];
         if (line != NULL) {
-          snprintf(line, lineLength + 1, fmt, _counter, timeInfo.tm_year, timeInfo.tm_mon, timeInfo.tm_mday, timeInfo.tm_hour, timeInfo.tm_min, timeInfo.tm_sec, //
-                   " ", " ", " ", "INVALID PACKET", entry.rssi, entry.snr, entry.freq_error);
+          lineLength = snprintf(nullptr, 0, fmt, _counter, timestamp, " ", //
+                                " ", " ", "INVALID PACKET", entry.rssi, entry.snr, entry.freq_error);
         }
       }
     } else {
-      lineLength = snprintf(nullptr, 0, fmt, _counter, timeInfo.tm_year, timeInfo.tm_mon, timeInfo.tm_mday, timeInfo.tm_hour, timeInfo.tm_min, timeInfo.tm_sec, //
-                            entry.msg->getSource().c_str(), entry.msg->getDestination().c_str(), entry.msg->getPath().c_str(), entry.msg->getRawBody().c_str(), //
+      lineLength = snprintf(nullptr, 0, fmt, _counter, timestamp, entry.msg->getSource().c_str(),                               //
+                            entry.msg->getDestination().c_str(), entry.msg->getPath().c_str(), entry.msg->getRawBody().c_str(), //
                             entry.rssi, entry.snr, entry.freq_error);
       if (lineLength > 0) {
         line = new char[lineLength + 1];
         if (line != NULL) {
-          snprintf(line, lineLength + 1, fmt, _counter, timeInfo.tm_year, timeInfo.tm_mon, timeInfo.tm_mday, timeInfo.tm_hour, timeInfo.tm_min, timeInfo.tm_sec, //
-                   entry.msg->getSource().c_str(), entry.msg->getDestination().c_str(), entry.msg->getPath().c_str(), entry.msg->getRawBody().c_str(),           //
+          snprintf(line, lineLength + 1, fmt, _counter, timestamp, entry.msg->getSource().c_str(),                     //
+                   entry.msg->getDestination().c_str(), entry.msg->getPath().c_str(), entry.msg->getRawBody().c_str(), //
                    entry.rssi, entry.snr, entry.freq_error);
         }
       }
