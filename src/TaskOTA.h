@@ -1,16 +1,16 @@
 #ifndef TASK_OTA_H_
 #define TASK_OTA_H_
 
+#include "System.h"
 #include <ArduinoOTA.h>
 #include <TaskManager.h>
 
-class OTATask : public Task {
+class OTATask : public FreeRTOSTask {
 public:
-  OTATask();
+  OTATask(UBaseType_t priority, BaseType_t coreId, const bool displayOnScreen, System &system);
   virtual ~OTATask();
 
-  virtual bool setup(System &system) override;
-  virtual bool loop(System &system) override;
+  void worker() override;
 
   enum Status {
     OTA_ForceDisabled, // OTA cannot be enabled
@@ -27,6 +27,7 @@ private:
   ArduinoOTAClass _ota;
   bool            _beginCalled;
   Status          _status;
+  System         &_system;
 
   uint32_t _enable_time;
   uint32_t _timeout;

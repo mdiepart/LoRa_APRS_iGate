@@ -6,21 +6,17 @@
 #include <TaskManager.h>
 #include <WiFi.h>
 
-class MQTTTask : public Task {
+class MQTTTask : public FreeRTOSTask {
 public:
-  MQTTTask(TaskQueue<std::shared_ptr<APRSMessage>> &toMQTT);
-  virtual ~MQTTTask();
+  MQTTTask(UBaseType_t priority, BaseType_t coreId, const bool displayOnScreen, System &system, QueueHandle_t &toMQTT);
 
-  virtual bool setup(System &system) override;
-  virtual bool loop(System &system) override;
+  void worker() override;
 
 private:
-  TaskQueue<std::shared_ptr<APRSMessage>> &_toMQTT;
-
-  WiFiClient   _client;
-  PubSubClient _MQTT;
-
-  bool connect(System &system);
+  System        &_system;
+  WiFiClient     _client;
+  QueueHandle_t &_toMQTT;
+  PubSubClient   _MQTT;
 };
 
 #endif

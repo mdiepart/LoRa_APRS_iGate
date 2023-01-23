@@ -56,7 +56,6 @@ private:
   std::map<String, targetProcessing> get_targets;
   std::map<String, targetProcessing> post_targets;
   std::set<String>                   known_resources;
-  System                             system;
 
   String   readHeader(WiFiClient &client);
   Header_t parseHeader(String start_line, String str);
@@ -64,7 +63,7 @@ private:
 
 class webTarget {
 public:
-  webTarget(String line);
+  explicit webTarget(String line);
 
   enum Method {
     NOT_SUPPORTED = 0,

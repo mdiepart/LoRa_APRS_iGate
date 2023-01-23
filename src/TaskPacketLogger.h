@@ -1,6 +1,7 @@
 #ifndef PACKET_LOGGER_H_
 #define PACKET_LOGGER_H_
 
+#include <APRSMessage.h>
 #include <FS.h>
 #include <TaskManager.h>
 #include <WiFiMulti.h>
@@ -9,44 +10,42 @@
 
 #define SEPARATOR "\t"
 
-class PacketLoggerTask : public Task {
+class PacketLoggerTask : public FreeRTOSTask {
 
 public:
-  PacketLoggerTask(String filename);
+  PacketLoggerTask(UBaseType_t priority, BaseType_t coreId, const bool displayOnScreen, System &system, const String filename, QueueHandle_t &queueHandle);
   virtual ~PacketLoggerTask();
 
-  bool   setup(System &system) override;
-  bool   loop(System &system) override;
-  void   logPacket(const String &callsign, const String &target, const String &path, const String &data, float RSSI, float SNR, float frequency_error);
+  void worker() override;
+
   String getTail(bool use_cache = true);
   bool   getFullLogs(WiFiClient &client);
 
 private:
-  typedef struct {
-    char  timestamp[21];
-    float RSSI;
-    float SNR;
-    float freq_error;
-    char  path[20];
-    char  callsign[10];
-    char  target[7];
-    char  data[253];
-  } log_line;
+  void rotate();
 
-  void rotate(System &system);
+  size_t         _nb_lines;
+  size_t         _nb_files;
+  size_t         _counter;
+  size_t         _max_tail_length;
+  size_t         _curr_tail_length;
+  unsigned int   _total_count;
+  String         _filename;
+  String         _tail;
+  const String   HEADER = String("NUMBER" SEPARATOR "TIMESTAMP" SEPARATOR "CALLSIGN" SEPARATOR "TARGET" SEPARATOR "PATH" SEPARATOR "DATA" SEPARATOR "RSSI" SEPARATOR "SNR" SEPARATOR "FREQ_ERROR");
+  System        &_system;
+  QueueHandle_t &_toPacketLogger;
+};
 
-  bool                 enabled;
-  size_t               nb_lines;
-  size_t               nb_files;
-  size_t               counter;
-  size_t               max_tail_length;
-  size_t               curr_tail_length;
-  unsigned int         total_count;
-  String               filename;
-  String               tail;
-  const String         HEADER     = String("NUMBER" SEPARATOR "TIMESTAMP" SEPARATOR "CALLSIGN" SEPARATOR "TARGET" SEPARATOR "PATH" SEPARATOR "DATA" SEPARATOR "RSSI" SEPARATOR "SNR" SEPARATOR "FREQ_ERROR");
-  const size_t         QUEUE_SIZE = 5;
-  std::queue<log_line> log_queue;
+struct logEntry {
+  logEntry();
+  logEntry(APRSMessage *msg, time_t rxTime, float rssi, float snr, float freq_error);
+
+  APRSMessage *msg;
+  time_t       rxTime;
+  float        rssi;
+  float        snr;
+  float        freq_error;
 };
 
 #endif

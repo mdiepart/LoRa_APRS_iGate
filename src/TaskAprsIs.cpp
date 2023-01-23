@@ -1,57 +1,65 @@
 #include <logger.h>
 
+#include "System.h"
 #include "Task.h"
 #include "TaskAprsIs.h"
 #include "project_configuration.h"
 
-AprsIsTask::AprsIsTask(TaskQueue<std::shared_ptr<APRSMessage>> &toAprsIs) : Task(TASK_APRS_IS, TaskAprsIs), _toAprsIs(toAprsIs) {
+AprsIsTask::AprsIsTask(UBaseType_t priority, BaseType_t coreId, const bool displayOnScreen, System &system, QueueHandle_t &toAprsIs) : FreeRTOSTask(TASK_APRS_IS, TaskAprsIs, priority, 2048, coreId, displayOnScreen), _toAprsIs(toAprsIs), _system(system) {
+  start();
 }
 
 AprsIsTask::~AprsIsTask() {
 }
 
-bool AprsIsTask::setup(System &system) {
-  _aprs_is.setup(system.getUserConfig()->callsign, system.getUserConfig()->aprs_is.passcode, "ESP32-APRS-IS", "0.2");
-  return true;
-}
+void AprsIsTask::worker() {
+  _aprs_is.setup(_system.getUserConfig()->callsign, _system.getUserConfig()->aprs_is.passcode, "ESP32-APRS-IS", "0.2");
 
-bool AprsIsTask::loop(System &system) {
-  if (!system.isWifiOrEthConnected()) {
-    return false;
+  while (!_system.isWifiOrEthConnected()) {
+    vTaskDelay(1000 / portTICK_PERIOD_MS);
   }
-  if (!_aprs_is.connected()) {
-    if (!connect(system)) {
-      _stateInfo = "not connected";
-      _state     = Error;
-      return false;
+
+  for (;;) {
+    if (!_system.isWifiOrEthConnected()) {
+      vTaskDelay(1000 / portTICK_PERIOD_MS);
+      continue;
     }
-    _stateInfo = "connected";
-    _state     = Okay;
-    return false;
+    if (!_aprs_is.connected()) {
+      if (!connect()) {
+        _stateInfo = "not connected";
+        _state     = Error;
+        vTaskDelay(1000 / portTICK_PERIOD_MS);
+        continue;
+      }
+      _stateInfo = "connected";
+      _state     = Okay;
+    }
+
+    _aprs_is.getAPRSMessage();
+
+    if (uxQueueMessagesWaiting(_toAprsIs) > 0) {
+      APRSMessage *msg;
+      xQueueReceive(_toAprsIs, &msg, 0);
+      _aprs_is.sendMessage(msg->encode() + "\n");
+      delete msg;
+    }
+
+    vTaskDelay(1000);
   }
-
-  _aprs_is.getAPRSMessage();
-
-  if (!_toAprsIs.empty()) {
-    std::shared_ptr<APRSMessage> msg = _toAprsIs.getElement();
-    _aprs_is.sendMessage(msg);
-  }
-
-  return true;
 }
 
-bool AprsIsTask::connect(System &system) {
-  logger.info(getName(), "connecting to APRS-IS server: %s on port: %d", system.getUserConfig()->aprs_is.server.c_str(), system.getUserConfig()->aprs_is.port);
-  APRS_IS::ConnectionStatus status = _aprs_is.connect(system.getUserConfig()->aprs_is.server, system.getUserConfig()->aprs_is.port);
+bool AprsIsTask::connect() {
+  APP_LOGI(getName(), "connecting to APRS-IS server: %s on port: %d", _system.getUserConfig()->aprs_is.server.c_str(), _system.getUserConfig()->aprs_is.port);
+  APRS_IS::ConnectionStatus status = _aprs_is.connect(_system.getUserConfig()->aprs_is.server, _system.getUserConfig()->aprs_is.port);
   if (status == APRS_IS::ERROR_CONNECTION) {
-    logger.error(getName(), "Something went wrong on connecting! Is the server reachable?");
-    logger.error(getName(), "Connection failed.");
+    APP_LOGE(getName(), "Something went wrong on connecting! Is the server reachable?");
+    APP_LOGE(getName(), "Connection failed.");
     return false;
   } else if (status == APRS_IS::ERROR_PASSCODE) {
-    logger.error(getName(), "User can not be verified with passcode!");
-    logger.error(getName(), "Connection failed.");
+    APP_LOGE(getName(), "User can not be verified with passcode!");
+    APP_LOGE(getName(), "Connection failed.");
     return false;
   }
-  logger.info(getName(), "Connected to APRS-IS server!");
+  APP_LOGI(getName(), "Connected to APRS-IS server!");
   return true;
 }

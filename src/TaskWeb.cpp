@@ -11,17 +11,15 @@
 #include "TaskWeb.h"
 #include "project_configuration.h"
 
-WebTask::WebTask() : Task(TASK_WEB, TaskWeb), http_server(80) {
+WebTask::WebTask(UBaseType_t priority, BaseType_t coreId, const bool displayOnScreen, System &system) : FreeRTOSTask(TASK_WEB, TaskWeb, priority, 8192, coreId, displayOnScreen), http_server(80), _system(system) {
+  start();
 }
 
 WebTask::~WebTask() {
+  http_server.close();
 }
 
-bool WebTask::setup(System &system) {
-  http_server.begin();
-  _stateInfo = "Online";
-  // system     = &sys;
-
+void WebTask::worker() {
   Webserver = webserver();
   {
     using namespace std::placeholders;
@@ -48,53 +46,57 @@ bool WebTask::setup(System &system) {
     Webserver.addTarget(webserver::GET, "/packets.log", fn_packet_logs); // /packets.log; auth
   }
 
-  logger.info(getName(), "Web server started.");
-  isServerStarted = true;
-  return true;
-}
+  isServerStarted = false;
+  _stateInfo      = "Awaiting network";
 
-bool WebTask::loop(System &system) {
-  if (isServerStarted && !system.isWifiOrEthConnected()) {
-    http_server.close();
-    isServerStarted = false;
-    logger.warn(getName(), "Closed HTTP server because network connection was lost.");
+  while (!_system.isWifiOrEthConnected()) {
+    vTaskDelay(pdMS_TO_TICKS(1000));
   }
+  for (;;) {
+    if (isServerStarted && !_system.isWifiOrEthConnected()) {
+      http_server.close();
+      isServerStarted = false;
+      APP_LOGW(getName(), "Closed HTTP server because network connection was lost.");
+      _stateInfo = "Awaiting network";
+    }
 
-  if (!isServerStarted && system.isWifiOrEthConnected()) {
-    http_server.begin();
-    isServerStarted = true;
-    logger.warn(getName(), "Network connection recovered, http server restarted.");
-  }
+    if (!isServerStarted && _system.isWifiOrEthConnected()) {
+      http_server.begin();
+      isServerStarted = true;
+      APP_LOGW(getName(), "Network connection recovered, http server restarted.");
+      _stateInfo = "Online";
+    }
 
-  // Check for too old client sessions every 10s
-  static uint32_t timeSinceRefresh = 0;
-  if (millis() - timeSinceRefresh >= 10000) {
-    for (auto client : connected_clients) {
-      if (millis() - client.second.timestamp > SESSION_LIFETIME) {
-        connected_clients.erase(client.first);
+    // Check for too old client sessions every 10s
+    static uint32_t timeSinceRefresh = 0;
+    if (millis() - timeSinceRefresh >= 10000) {
+      for (auto client : connected_clients) {
+        if (millis() - client.second.timestamp > SESSION_LIFETIME) {
+          connected_clients.erase(client.first);
+        }
       }
     }
+
+    if (!isServerStarted) {
+      vTaskDelay(pdMS_TO_TICKS(1000));
+      continue;
+    }
+
+    // Check if we have a client available and serve it
+    WiFiClient client = http_server.available();
+
+    if (client) {
+      client.setTimeout(TIMEOUT);
+      APP_LOGI(getName(), "new client with IP %s.", client.localIP().toString().c_str());
+
+      Webserver.serve(client, _system);
+
+      // Close the connection
+      client.stop();
+    }
+
+    vTaskDelay(pdMS_TO_TICKS(100));
   }
-
-  if (!isServerStarted) {
-    return true;
-  }
-
-  // Check if we have a client available and serve it
-  WiFiClient client = http_server.available();
-
-  if (client) {
-    client.setTimeout(TIMEOUT);
-    logger.info(getName(), "new client with IP %s.", client.localIP().toString().c_str());
-
-    Webserver.serve(client, system);
-
-    // Close the connection
-    // client.flush();
-    client.stop();
-  }
-
-  return true;
 }
 
 String WebTask::loadPage(String file) {
@@ -159,28 +161,28 @@ void WebTask::info_page(WiFiClient &client, webserver::Header_t &header, System 
 
   // Build $$TASKLIST$$ string
   String tasklist = "";
-  for (Task *task : system.getTaskManager().getTasks()) {
+  for (FreeRTOSTask *task : system.getTaskManager().getFreeRTOSTasks()) {
     switch (task->getTaskId()) {
     case TaskOta:
-      switch (((OTATask *)task)->getOTAStatus()) {
+      switch (static_cast<OTATask *>(task)->getOTAStatus()) {
       case OTATask::Status::OTA_ForceDisabled:
-        tasklist += "<p class=\"task\">" + task->getName() + ": Disabled.</p>";
+        tasklist += String("<p class=\"task\">") + task->getName() + ": Disabled.</p>";
         break;
       case OTATask::Status::OTA_ForceEnabled:
-        tasklist += "<p class=\"task ok\">" + task->getName() + ": Enabled.</p>";
+        tasklist += String("<p class=\"task ok\">") + task->getName() + ": Enabled.</p>";
         break;
       case OTATask::Status::OTA_Disabled:
-        tasklist += "<p class=\"task warning\">" + task->getName() + ": Disabled. Use web interface to enable.</p>";
+        tasklist += String("<p class=\"task warning\">") + task->getName() + ": Disabled. Use web interface to enable.</p>";
         break;
       case OTATask::Status::OTA_Enabled:
-        tasklist += "<p class=\"task ok\">" + task->getName() + ": Enabled for ";
-        unsigned int seconds = ((OTATask *)task)->getTimeRemaining() / 1000;
+        tasklist += String("<p class=\"task ok\">") + task->getName() + ": Enabled for ";
+        unsigned int seconds = static_cast<OTATask *>(task)->getTimeRemaining() / 1000;
         tasklist += String(seconds) + " more seconds.</p>";
         break;
       }
       break;
     case TaskWifi:
-      tasklist += "<p class=\"task ok\">" + task->getName() + ": connected to AP \"" + WiFi.SSID() + "\". RSSI is " + String(WiFi.RSSI()) +
+      tasklist += String("<p class=\"task ok\">") + task->getName() + ": connected to AP \"" + WiFi.SSID() + "\". RSSI is " + String(WiFi.RSSI()) +
                   "dBm "
                   "and IP is " +
                   WiFi.localIP().toString().c_str() + ".</p>";
@@ -197,9 +199,10 @@ void WebTask::info_page(WiFiClient &client, webserver::Header_t &header, System 
         tasklist += "<p class=\"task error\">";
         break;
       }
-      tasklist += task->getName() + ": " + task->getStateInfo() + "</p>";
+      tasklist += String(task->getName()) + ": " + task->getStateInfo() + "</p>";
     }
   }
+
   page.replace("$$TASKLIST$$", tasklist);
 
   String logs = system.getPacketLogger()->getTail();
@@ -229,12 +232,10 @@ void WebTask::enableota_page(WiFiClient &client, webserver::Header_t &header, Sy
 
   // Load page and replace placeholder
   String page = loadPage("/enableOTA.html");
-
-  std::list<Task *> tasks = system.getTaskManager().getTasks();
-  for (Task *it : system.getTaskManager().getTasks()) {
+  for (FreeRTOSTask *it : system.getTaskManager().getFreeRTOSTasks()) {
     if (it->getTaskId() == TaskOta) {
-      ((OTATask *)it)->enableOTA(5 * 60 * 1000); // Enabling OTA for 5 minutes
-      logger.info(getName(), "User enabled OTA for 5 minutes via web interface");
+      static_cast<OTATask *>(it)->enableOTA(5 * 60 * 1000); // Enabling OTA for 5 minutes
+      APP_LOGI(getName(), "User enabled OTA for 5 minutes via web interface");
       page.replace("$$STATUS$$", "<p style=\"text-align: center; color: white;\">OTA Enabled for 5 minutes.</p>");
 
       break;
@@ -259,14 +260,14 @@ void WebTask::uploadfw_page(WiFiClient &client, webserver::Header_t &header, Sys
   webserver::Header_t::const_iterator it_content_type = header.find("Content-Type");
   if (it_content_type == header.cend()) {
     // This header does not describe data the way we expect it
-    logger.debug(getName(), "No content type in header.");
+    APP_LOGD(getName(), "No content type in header.");
     client.println(STATUS_400);
     return;
   } else {
     // Fetch boundary token
     String content_type = it_content_type->second;
     boundary_token      = "--" + content_type.substring(content_type.indexOf(str_boundary) + str_boundary.length());
-    logger.debug(getName(), "The boundary to compare with is %s.", boundary_token.c_str());
+    APP_LOGD(getName(), "The boundary to compare with is %s.", boundary_token.c_str());
   }
 
   // Finished parsing header. Now parsing form data
@@ -275,7 +276,6 @@ void WebTask::uploadfw_page(WiFiClient &client, webserver::Header_t &header, Sys
   uint8_t     *read_buffer                    = full_buffer + 2;
   full_buffer[1]                              = '\n'; // This char will always be '\n'
   int       len;
-  size_t    file_size = 0;
   String    name;
   String    filename;
   esp_err_t esp_error = ESP_OK;
@@ -283,19 +283,20 @@ void WebTask::uploadfw_page(WiFiClient &client, webserver::Header_t &header, Sys
   // Read a line. It should be the first boundary of the form-data
   len                  = client.readBytesUntil('\n', read_buffer, BUFFER_LENGTH);
   read_buffer[len - 1] = '\0'; // Replace '\r' by '\0'
-  logger.debug("uploadFW", "boundary token = %s, buffer = %s.", boundary_token.c_str(), read_buffer);
+  APP_LOGD("uploadFW", "boundary token = %s, buffer = %s.", boundary_token.c_str(), read_buffer);
   if (strcmp(boundary_token.c_str(), (const char *)read_buffer) == 0) { // We found a boundary token. It should be at the beginning of a form part
+    size_t file_size = 0;
     while (client.available() && esp_error == ESP_OK) {
-      String header = readCRLFCRLF(client); // Read the header that is just after the boundary
+      String headerStr = readCRLFCRLF(client); // Read the header that is just after the boundary
       // Determine field name
-      name     = header.substring(header.indexOf("name=\"") + strlen("name=\""), header.indexOf("\"; filename"));
-      filename = header.substring(header.indexOf("filename=\"") + strlen("filename=\""), header.indexOf("\"\r\n"));
-      logger.debug(getName(), "Section with name=\"%s\" and filename = \"%s\".", name.c_str(), filename.c_str());
+      name     = headerStr.substring(headerStr.indexOf("name=\"") + strlen("name=\""), headerStr.indexOf("\"; filename"));
+      filename = headerStr.substring(headerStr.indexOf("filename=\"") + strlen("filename=\""), headerStr.indexOf("\"\r\n"));
+      APP_LOGD(getName(), "Section with name=\"%s\" and filename = \"%s\".", name.c_str(), filename.c_str());
 
       if (name.equals("Firmware_File")) {
         // if no filename, we skip firmware upload
         if (filename.isEmpty()) {
-          logger.debug(getName(), "No firmware file, skipping.");
+          APP_LOGD(getName(), "No firmware file, skipping.");
           continue;
         }
 
@@ -305,7 +306,7 @@ void WebTask::uploadfw_page(WiFiClient &client, webserver::Header_t &header, Sys
         esp_error                             = esp_ota_begin(next_part, OTA_SIZE_UNKNOWN, &ota_handle);
 
         if (esp_error != ESP_OK) {
-          logger.warn(getName(), "Error starting OTA.");
+          APP_LOGW(getName(), "Error starting OTA.");
           break;
         }
 
@@ -317,7 +318,7 @@ void WebTask::uploadfw_page(WiFiClient &client, webserver::Header_t &header, Sys
           if (client.available()) {
             len = client.readBytesUntil('\n', read_buffer, BUFFER_LENGTH);
           } else {
-            logger.debug(getName(), "No more bytes available.\n\n\n");
+            APP_LOGD(getName(), "No more bytes available.\n\n\n");
             break;
           }
 
@@ -351,7 +352,7 @@ void WebTask::uploadfw_page(WiFiClient &client, webserver::Header_t &header, Sys
             }
 
             if (len < 0) {
-              logger.info(getName(), "len < 0");
+              APP_LOGI(getName(), "len < 0");
             }
             esp_ota_write(ota_handle, data, len);
 
@@ -365,39 +366,39 @@ void WebTask::uploadfw_page(WiFiClient &client, webserver::Header_t &header, Sys
           }
         }
 
-        logger.debug(getName(), "Finished parsing binary file. Size is %d", file_size);
+        APP_LOGD(getName(), "Finished parsing binary file. Size is %d", file_size);
 
         if (esp_error == ESP_OK) {
           esp_error = esp_ota_end(ota_handle);
         } else {
           // esp_ota_abort(ota_handle);
-          logger.debug(getName(), "Error while writing to ota. Code is %d", esp_error);
+          APP_LOGD(getName(), "Error while writing to ota. Code is %d", esp_error);
         }
 
         switch (esp_error) {
         case ESP_OK:
-          logger.debug(getName(), "OTA Succeeded.");
+          APP_LOGD(getName(), "OTA Succeeded.");
           esp_ota_set_boot_partition(next_part);
           break;
         case ESP_ERR_NOT_FOUND:
-          logger.warn(getName(), "ESP_ERR_NOT_FOUND.");
+          APP_LOGW(getName(), "ESP_ERR_NOT_FOUND.");
           break;
         case ESP_ERR_INVALID_ARG:
-          logger.warn(getName(), "ESP_ERR_INVALID_ARG.");
+          APP_LOGW(getName(), "ESP_ERR_INVALID_ARG.");
           break;
         case ESP_ERR_OTA_VALIDATE_FAILED:
-          logger.warn(getName(), "ESP_ERR_OTA_VALIDATE_FAILED.");
+          APP_LOGW(getName(), "ESP_ERR_OTA_VALIDATE_FAILED.");
           break;
         case ESP_ERR_INVALID_STATE:
-          logger.warn(getName(), "ESP_ERR_INVALID_STATE.");
+          APP_LOGW(getName(), "ESP_ERR_INVALID_STATE.");
           break;
         default:
-          logger.warn(getName(), "ESP OTA unknown error...");
+          APP_LOGW(getName(), "ESP OTA unknown error...");
           break;
         }
       } else if (name.equals("SPIFFS_File")) {
         if (filename.isEmpty()) { // Do not update spiffs if we have no SPIFFS file
-          logger.debug(getName(), "No SPIFFS file uploaded. Skipping.");
+          APP_LOGD(getName(), "No SPIFFS file uploaded. Skipping.");
           continue;
         }
 
@@ -409,7 +410,7 @@ void WebTask::uploadfw_page(WiFiClient &client, webserver::Header_t &header, Sys
 
         esp_error = esp_partition_erase_range(spiffs_part, 0, spiffs_part->size);
         if (esp_error != ESP_OK) {
-          logger.warn(getName(), "Impossible to erase SPIFFS partition...");
+          APP_LOGW(getName(), "Impossible to erase SPIFFS partition...");
           break;
         }
 
@@ -461,7 +462,7 @@ void WebTask::uploadfw_page(WiFiClient &client, webserver::Header_t &header, Sys
         }
 
         if (esp_error != ESP_OK) {
-          logger.warn(getName(), "Error while writing to spiffs partition.");
+          APP_LOGW(getName(), "Error while writing to spiffs partition.");
           break;
         }
       }
@@ -472,7 +473,7 @@ void WebTask::uploadfw_page(WiFiClient &client, webserver::Header_t &header, Sys
      }*/
   } else {
     // No token where one is expected
-    logger.warn(getName(), "Could not find firmware data.");
+    APP_LOGW(getName(), "Could not find firmware data.");
 
     client.println(STATUS_400);
     return;
@@ -488,7 +489,7 @@ void WebTask::uploadfw_page(WiFiClient &client, webserver::Header_t &header, Sys
                  "</body></html>\r\n");
 
   if (esp_error == ESP_OK) {
-    logger.warn(getName(), "ESP OTA succeeded. Restarting in 2s.");
+    APP_LOGW(getName(), "ESP OTA succeeded. Restarting in 2s.");
     client.stop();
     esp_restart();
   }
@@ -528,14 +529,14 @@ void WebTask::login_page(WiFiClient &client, webserver::Header_t &header, System
       esp_fill_random(cookie_value, 64);
 
       // Transform random values to valid alphanumeric chars
-      for (size_t i = 0; i < 64; i++) {
-        uint8_t b = cookie_value[i] % 62;
+      for (size_t j = 0; j < 64; j++) {
+        uint8_t b = cookie_value[j] % 62;
         if (b < 10) {
-          cookie_value[i] = '0' + b;
+          cookie_value[j] = '0' + b;
         } else if (b < 36) {
-          cookie_value[i] = 'A' + b - 10;
+          cookie_value[j] = 'A' + b - 10;
         } else {
-          cookie_value[i] = 'a' + b - 36;
+          cookie_value[j] = 'a' + b - 36;
         }
       }
 

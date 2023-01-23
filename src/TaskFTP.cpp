@@ -2,40 +2,42 @@
 #include <SPIFFS.h>
 #include <logger.h>
 
+#include "System.h"
 #include "Task.h"
 #include "TaskFTP.h"
 #include "project_configuration.h"
 
-FTPTask::FTPTask() : Task(TASK_FTP, TaskFtp), _beginCalled(false) {
+FTPTask::FTPTask(UBaseType_t priority, BaseType_t coreId, const bool displayOnScreen, System &system) : FreeRTOSTask(TASK_FTP, TaskFtp, priority, 9216, coreId, displayOnScreen), _system(system) {
+  /* File buffer inside FTP server is 4096 bytes.*/
+  start();
 }
 
-FTPTask::~FTPTask() {
-}
-
-bool FTPTask::setup(System &system) {
-  for (Configuration::Ftp::User user : system.getUserConfig()->ftp.users) {
-    logger.debug(getName(), "Adding user to FTP Server: %s", user.name.c_str());
+void FTPTask::worker() {
+  for (Configuration::Ftp::User user : _system.getUserConfig()->ftp.users) {
+    APP_LOGD(getName(), "Adding user to FTP Server: %s", user.name.c_str());
     _ftpServer.addUser(user.name, user.password);
   }
   _ftpServer.addFilesystem("SPIFFS", &SPIFFS);
   _stateInfo = "waiting";
-  return true;
-}
+  while (!_system.isWifiOrEthConnected()) {
+    vTaskDelay(100 / portTICK_PERIOD_MS);
+  }
+  _ftpServer.begin();
 
-bool FTPTask::loop(System &system) {
-  if (!_beginCalled) {
-    _ftpServer.begin();
-    _beginCalled = true;
+  bool configWasOpen = false;
+  for (;;) {
+    _ftpServer.handle();
+    if (configWasOpen && _ftpServer.countConnections() == 0) {
+      APP_LOGW(getName(), "Maybe the config has been changed via FTP, lets restart now to get the new config...");
+      ESP.restart();
+    }
+
+    if (_ftpServer.countConnections() > 0) {
+      configWasOpen = true;
+      _stateInfo    = "Has connection";
+      vTaskDelay(100 / portTICK_PERIOD_MS);
+    } else if (_ftpServer.countConnections() == 0) {
+      vTaskDelay(500 / portTICK_PERIOD_MS);
+    }
   }
-  _ftpServer.handle();
-  static bool configWasOpen = false;
-  if (configWasOpen && _ftpServer.countConnections() == 0) {
-    logger.warn(getName(), "Maybe the config has been changed via FTP, lets restart now to get the new config...");
-    ESP.restart();
-  }
-  if (_ftpServer.countConnections() > 0) {
-    configWasOpen = true;
-    _stateInfo    = "has connection";
-  }
-  return true;
 }

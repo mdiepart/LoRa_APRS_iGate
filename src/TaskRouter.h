@@ -4,19 +4,19 @@
 #include <APRSMessage.h>
 #include <TaskManager.h>
 
-class RouterTask : public Task {
+class RouterTask : public FreeRTOSTask {
 public:
-  RouterTask(TaskQueue<std::shared_ptr<APRSMessage>> &fromModem, TaskQueue<std::shared_ptr<APRSMessage>> &toModem, TaskQueue<std::shared_ptr<APRSMessage>> &toAprsIs, TaskQueue<std::shared_ptr<APRSMessage>> &toMQTT);
+  RouterTask(UBaseType_t priority, BaseType_t coreId, const bool displayOnScreen, System &system, QueueHandle_t &fromModem, QueueHandle_t &toModem, QueueHandle_t &toAprsIs, QueueHandle_t &toMQTT);
   virtual ~RouterTask();
 
-  virtual bool setup(System &system) override;
-  virtual bool loop(System &system) override;
+  void worker() override;
 
 private:
-  TaskQueue<std::shared_ptr<APRSMessage>> &_fromModem;
-  TaskQueue<std::shared_ptr<APRSMessage>> &_toModem;
-  TaskQueue<std::shared_ptr<APRSMessage>> &_toAprsIs;
-  TaskQueue<std::shared_ptr<APRSMessage>> &_toMQTT;
+  System        &_system;
+  QueueHandle_t &_fromModem;
+  QueueHandle_t &_toModem;
+  QueueHandle_t &_toAprsIs;
+  QueueHandle_t &_toMQTT;
 };
 
 #endif

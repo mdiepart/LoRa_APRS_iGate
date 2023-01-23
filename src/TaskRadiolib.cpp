@@ -1,37 +1,48 @@
 #include <Task.h>
-#include <TimeLib.h>
+#include <ctime>
 #include <logger.h>
 
+#include "System.h"
+#include "Task.h"
+#include "TaskDisplay.h"
 #include "TaskPacketLogger.h"
 #include "TaskRadiolib.h"
 
-RadiolibTask::RadiolibTask(TaskQueue<std::shared_ptr<APRSMessage>> &fromModem, TaskQueue<std::shared_ptr<APRSMessage>> &toModem) : Task(TASK_RADIOLIB, TaskRadiolib), _fromModem(fromModem), _toModem(toModem) {
+int transmissionState = RADIOLIB_ERR_NONE;
+
+static xTaskHandle       taskToNotify      = NULL; // Used for direct-to-task notification when waiting for tx to complete
+static SemaphoreHandle_t radioIRQSemaphore = NULL; // Used by the task when waiting for an RX event to occur
+static volatile bool     enableInterrupt   = true; // Need to catch interrupt or not.
+
+static void radioCallback() {
+  BaseType_t higherPriorityAwoken = pdFALSE;
+  if (taskToNotify == NULL) {
+    xSemaphoreGiveFromISR(radioIRQSemaphore, &higherPriorityAwoken);
+    portYIELD_FROM_ISR(higherPriorityAwoken);
+  } else {
+    vTaskNotifyGiveFromISR(taskToNotify, &higherPriorityAwoken);
+    portYIELD_FROM_ISR(higherPriorityAwoken);
+  }
+}
+
+RadiolibTask::RadiolibTask(UBaseType_t priority, BaseType_t coreId, const bool displayOnScreen, System &system, QueueHandle_t &fromModem, QueueHandle_t &toModem, QueueHandle_t &toPacketLogger, QueueHandle_t &toDisplay)
+    : FreeRTOSTask(TASK_RADIOLIB, TaskRadiolib, priority, 2560, coreId, displayOnScreen), module(NULL), radio(NULL), _system(system), config(system.getUserConfig()->lora), rxEnable(true), txEnable(config.tx_enable), _fromModem(fromModem), _toModem(toModem), _toPacketLogger(toPacketLogger), _toDisplay(toDisplay) {
+  start();
 }
 
 RadiolibTask::~RadiolibTask() {
   radio->clearDio0Action();
 }
 
-volatile bool RadiolibTask::enableInterrupt = true;  // Need to catch interrupt or not.
-volatile bool RadiolibTask::operationDone   = false; // Caught IRQ or not.
+void RadiolibTask::worker() {
+  time_t    now;
+  struct tm timeInfo;
+  char      timeStr[9];
 
-void RadiolibTask::setFlag(void) {
-  if (!enableInterrupt) {
-    return;
-  }
-
-  operationDone = true;
-}
-
-bool RadiolibTask::setup(System &system) {
-  SPI.begin(system.getBoardConfig()->LoraSck, system.getBoardConfig()->LoraMiso, system.getBoardConfig()->LoraMosi, system.getBoardConfig()->LoraCS);
-  module = new Module(system.getBoardConfig()->LoraCS, system.getBoardConfig()->LoraIRQ, system.getBoardConfig()->LoraReset);
+  radioIRQSemaphore = xSemaphoreCreateBinary();
+  SPI.begin(_system.getBoardConfig()->LoraSck, _system.getBoardConfig()->LoraMiso, _system.getBoardConfig()->LoraMosi, _system.getBoardConfig()->LoraCS);
+  module = new Module(_system.getBoardConfig()->LoraCS, _system.getBoardConfig()->LoraIRQ, _system.getBoardConfig()->LoraReset);
   radio  = new SX1278(module);
-
-  config = system.getUserConfig()->lora;
-
-  rxEnable = true;
-  txEnable = config.tx_enable;
 
   float freqMHz = (float)config.frequencyRx / 1000000;
   float BWkHz   = (float)config.signalBandwidth / 1000;
@@ -42,39 +53,39 @@ bool RadiolibTask::setup(System &system) {
   if (state != RADIOLIB_ERR_NONE) {
     switch (state) {
     case RADIOLIB_ERR_INVALID_FREQUENCY:
-      logger.error(getName(), "[%s] SX1278 init failed, The supplied frequency value (%fMHz) is invalid for this module.", timeString().c_str(), freqMHz);
+      APP_LOGE(getName(), "SX1278 init failed, The supplied frequency value (%fMHz) is invalid for this module.", freqMHz);
       rxEnable = false;
       txEnable = false;
       break;
     case RADIOLIB_ERR_INVALID_BANDWIDTH:
-      logger.error(getName(), "[%s] SX1278 init failed, The supplied bandwidth value (%fkHz) is invalid for this module. Should be 7800, 10400, 15600, 20800, 31250, 41700 ,62500, 125000, 250000, 500000.", timeString().c_str(), BWkHz);
+      APP_LOGE(getName(), "SX1278 init failed, The supplied bandwidth value (%fkHz) is invalid for this module. Should be 7800, 10400, 15600, 20800, 31250, 41700 ,62500, 125000, 250000, 500000.", BWkHz);
       rxEnable = false;
       txEnable = false;
       break;
     case RADIOLIB_ERR_INVALID_SPREADING_FACTOR:
-      logger.error(getName(), "[%s] SX1278 init failed, The supplied spreading factor value (%d) is invalid for this module.", timeString().c_str(), config.spreadingFactor);
+      APP_LOGE(getName(), "SX1278 init failed, The supplied spreading factor value (%d) is invalid for this module.", config.spreadingFactor);
       rxEnable = false;
       txEnable = false;
       break;
     case RADIOLIB_ERR_INVALID_CODING_RATE:
-      logger.error(getName(), "[%s] SX1278 init failed, The supplied coding rate value (%d) is invalid for this module.", timeString().c_str(), config.codingRate4);
+      APP_LOGE(getName(), "SX1278 init failed, The supplied coding rate value (%d) is invalid for this module.", config.codingRate4);
       rxEnable = false;
       txEnable = false;
       break;
     case RADIOLIB_ERR_INVALID_OUTPUT_POWER:
-      logger.error(getName(), "[%s] SX1278 init failed, The supplied output power value (%d) is invalid for this module.", timeString().c_str(), config.power);
+      APP_LOGE(getName(), "SX1278 init failed, The supplied output power value (%d) is invalid for this module.", config.power);
       txEnable = false;
       break;
     case RADIOLIB_ERR_INVALID_PREAMBLE_LENGTH:
-      logger.error(getName(), "[%s] SX1278 init failed, The supplied preamble length is invalid.", timeString().c_str());
+      APP_LOGE(getName(), "SX1278 init failed, The supplied preamble length is invalid.");
       txEnable = false;
       break;
     case RADIOLIB_ERR_INVALID_GAIN:
-      logger.error(getName(), "[%s] SX1278 init failed, The supplied gain value (%d) is invalid.", timeString().c_str(), config.gainRx);
+      APP_LOGE(getName(), "SX1278 init failed, The supplied gain value (%d) is invalid.", config.gainRx);
       rxEnable = false;
       break;
     default:
-      logger.error(getName(), "[%s] SX1278 init failed, code %d", timeString().c_str(), state);
+      APP_LOGE(getName(), "SX1278 init failed, code %d", state);
       rxEnable = false;
       txEnable = false;
     }
@@ -84,17 +95,41 @@ bool RadiolibTask::setup(System &system) {
 
   state = radio->setCRC(true);
   if (state != RADIOLIB_ERR_NONE) {
-    logger.error(getName(), "[%s] setCRC failed, code %d", timeString().c_str(), state);
+    APP_LOGE(getName(), "setCRC failed, code %d", state);
     _stateInfo = "LoRa-Modem failed";
     _state     = Error;
   }
 
-  radio->setDio0Action(setFlag);
+  portMUX_TYPE mutex = portMUX_INITIALIZER_UNLOCKED;
+  taskENTER_CRITICAL(&mutex);
+  xQueueReset(_toModem);
+  UBaseType_t queueSetSize = 1; /* Queue size + 1 for the binary semaphore */
+  if (_system.getUserConfig()->lora.tx_enable) {
+    queueSetSize += uxQueueSpacesAvailable(_toModem);
+  }
+
+  QueueSetHandle_t modemQueueSet = xQueueCreateSet(queueSetSize);
+  bool             queueResult   = pdTRUE;
+
+  if (_system.getUserConfig()->lora.tx_enable) {
+    queueResult &= xQueueAddToSet(_toModem, modemQueueSet);
+  }
+
+  queueResult &= xQueueAddToSet(radioIRQSemaphore, modemQueueSet);
+  taskEXIT_CRITICAL(&mutex);
+
+  if (queueResult == pdFAIL) {
+    _state     = Error;
+    _stateInfo = "Error with queue set";
+    return;
+  }
+
+  radio->setDio0Action(radioCallback);
 
   if (rxEnable) {
     int state = startRX(RADIOLIB_SX127X_RXCONTINUOUS);
     if (state != RADIOLIB_ERR_NONE) {
-      logger.error(getName(), "[%s] startRX failed, code %d", timeString().c_str(), state);
+      APP_LOGE(getName(), "startRX failed, code %d", state);
       rxEnable   = false;
       _stateInfo = "LoRa-Modem failed";
       _state     = Error;
@@ -105,109 +140,106 @@ bool RadiolibTask::setup(System &system) {
     radio->setCurrentLimit(140);
   }
 
-  preambleDurationMilliSec = ((uint64_t)(preambleLength + 4) << (config.spreadingFactor + 10 /* to milli-sec */)) / config.signalBandwidth;
-
   _stateInfo = "";
-  return true;
-}
 
-int  transmissionState = RADIOLIB_ERR_NONE;
-bool transmitFlag      = false; // Transmitting or not.
+  QueueSetMemberHandle_t activatedMember;
 
-bool RadiolibTask::loop(System &system) {
-  if (operationDone) { // occurs interrupt.
-    enableInterrupt = false;
+  for (;;) {
 
-    if (transmitFlag) { // transmitted.
-      if (transmissionState == RADIOLIB_ERR_NONE) {
-        logger.debug(getName(), "[%s] TX done", timeString().c_str());
-
-      } else {
-        logger.error(getName(), "[%s] transmitFlag failed, code %d", timeString().c_str(), transmissionState);
-      }
-      operationDone = false;
-      transmitFlag  = false;
-
-      txWaitTimer.setTimeout(preambleDurationMilliSec * 2);
-      txWaitTimer.start();
-
-    } else { // received.
+    activatedMember = xQueueSelectFromSet(modemQueueSet, portMAX_DELAY);
+    time(&now);
+    localtime_r(&now, &timeInfo);
+    strftime(timeStr, sizeof(timeStr), "%T", &timeInfo);
+    if (activatedMember == radioIRQSemaphore) {
+      xSemaphoreTake(radioIRQSemaphore, 0);
       String str;
       int    state = radio->readData(str);
 
       if (state == RADIOLIB_ERR_CRC_MISMATCH) {
         // Log an error
-        logger.error(getName(), "[%s] Received corrupt packet (CRC check failed)", timeString().c_str());
-        system.getPacketLogger()->logPacket("", "", "", "CRC error", radio->getRSSI(), radio->getSNR(), radio->getFrequencyError());
+        APP_LOGI(getName(), "[%s] Received corrupt packet (CRC check failed)", timeStr);
+        logEntry entry(NULL, now, radio->getRSSI(), radio->getSNR(), radio->getFrequencyError());
       } else if (state != RADIOLIB_ERR_NONE) {
-        logger.error(getName(), "[%s] readData failed, code %d", timeString().c_str(), state);
+        APP_LOGE(getName(), "[%s] readData failed, code %d", timeStr, state);
       } else {
         if (str.substring(0, 3) != "<\xff\x01") {
-          logger.debug(getName(), "[%s] Unknown packet '%s' with RSSI %.0fdBm, SNR %.2fdB and FreqErr %fHz", timeString().c_str(), str.c_str(), radio->getRSSI(), radio->getSNR(), -radio->getFrequencyError());
+          APP_LOGD(getName(), "[%s] Unknown packet '%s' with RSSI %.0fdBm, SNR %.2fdB and FreqErr %fHz", timeStr, str.c_str(), radio->getRSSI(), radio->getSNR(), -radio->getFrequencyError());
         } else {
-          std::shared_ptr<APRSMessage> msg = std::shared_ptr<APRSMessage>(new APRSMessage());
-          msg->decode(str.substring(3));
-          String msgData = msg->getBody()->getData();
+          String msgData = str.substring(3);
 
           // Replace all non-printable chars by spaces
           for (char c = 0; c < ' '; c++) {
             msgData.replace(String(c), " ");
           }
 
-          msg->getBody()->setData(msgData);
+          // Create the packets
+          APRSMessage *modemMsg = new APRSMessage();
+          modemMsg->decode(msgData);
+          APRSMessage *loggerMsg = new APRSMessage(*modemMsg);
+          logEntry     log(loggerMsg, now, radio->getRSSI(), radio->getSNR(), radio->getFrequencyError());
 
-          _fromModem.addElement(msg);
-          logger.debug(getName(), "[%s] Received packet '%s' with RSSI %.0fdBm, SNR %.2fdB and FreqErr %fHz", timeString().c_str(), msg->toString().c_str(), radio->getRSSI(), radio->getSNR(), -radio->getFrequencyError());
-          system.getDisplay().addFrame(std::shared_ptr<DisplayFrame>(new TextFrame("LoRa", msg->toString().c_str())));
-          TimeElements tm;
-          breakTime(now(), tm);
-          char timestamp[32];
-          snprintf(timestamp, 31, "%04d-%02d-%02dT%02d:%02d:%02dZ", 1970 + tm.Year, tm.Month, tm.Day, tm.Hour, tm.Minute, tm.Second);
-          system.getPacketLogger()->logPacket(msg->getSource(), msg->getDestination(), msg->getPath(), msg->getBody()->getData(), radio->getRSSI(), radio->getSNR(), radio->getFrequencyError());
+          // Dispatch the packets
+          xQueueSend(_fromModem, &modemMsg, pdMS_TO_TICKS(100));
+          xQueueSend(_toPacketLogger, &log, pdMS_TO_TICKS(100));
+
+          // Log the packet received in serial terminal
+          APP_LOGI(getName(), "[%s] Received packet '%s' with RSSI %.0fdBm, SNR %.2fdB and FreqErr %fHz", timeStr, modemMsg->toString().c_str(), radio->getRSSI(), radio->getSNR(), -radio->getFrequencyError());
+
+          // Display the received packet on screen
+          TextFrame *frame = new TextFrame("LoRa", modemMsg->toString().c_str());
+          xQueueSendToBack(_toDisplay, &frame, pdTICKS_TO_MS(100));
         }
       }
-      operationDone = false;
-    }
+      if (rxEnable) {
+        int state = startRX(RADIOLIB_SX127X_RXCONTINUOUS);
+        if (state != RADIOLIB_ERR_NONE) {
+          APP_LOGE(getName(), "[%s] startRX failed, code %d", now, state);
+          rxEnable = false;
+        }
+      }
 
-    if (rxEnable) {
-      int state = startRX(RADIOLIB_SX127X_RXCONTINUOUS);
+    } else if (activatedMember == _toModem) {
+      /* _toModem will not be in the set if tx is not enabled*/
+      APRSMessage *msg;
+      xQueueReceive(_toModem, &msg, 0);
+
+      APP_LOGD(getName(), "[%s] Transmitting packet '%s'", timeStr, msg->toString().c_str());
+
+      // Transmit packet
+      int16_t state = startTX("<\xff\x01" + msg->encode());
       if (state != RADIOLIB_ERR_NONE) {
-        logger.error(getName(), "[%s] startRX failed, code %d", timeString().c_str(), state);
-        rxEnable = false;
-      }
-    }
-
-    enableInterrupt = true;
-  } else { // not interrupt.
-    if (!txWaitTimer.check()) {
-    } else {
-      if (!txEnable) {
-        // logger.debug(getName(), "[%s] TX is not enabled", timeString().c_str());
+        APP_LOGE(getName(), "[%s] startTX failed, code %d", timeStr, state);
+        txEnable = false;
       } else {
-        if (transmitFlag) {
-          // logger.debug(getName(), "[%s] TX signal detected. Waiting TX", timeString().c_str());
-        } else {
-          if (!_toModem.empty()) {
-            if (config.frequencyRx == config.frequencyTx && (radio->getModemStatus() & 0x01) == 0x01) {
-              // logger.debug(getName(), "[%s] RX signal detected. Waiting TX", timeString().c_str());
-            } else {
-              std::shared_ptr<APRSMessage> msg = _toModem.getElement();
-              logger.debug(getName(), "[%s] Transmitting packet '%s'", timeString().c_str(), msg->toString().c_str());
 
-              int16_t state = startTX("<\xff\x01" + msg->encode());
-              if (state != RADIOLIB_ERR_NONE) {
-                logger.error(getName(), "[%s] startTX failed, code %d", timeString().c_str(), state);
-                txEnable = false;
-                return true;
-              }
-            }
-          }
+        /* Wait 10s max for tx to complete */
+        uint32_t txDone = ulTaskNotifyTake(pdTRUE, pdMS_TO_TICKS(10000));
+        time(&now);
+        localtime_r(&now, &timeInfo);
+        strftime(timeStr, sizeof(timeStr), "%T", &timeInfo);
+        if (txDone != 1) {
+          APP_LOGE(getName(), "TX error: Tx not finished after waiting 10s.");
+        } else if (transmissionState != RADIOLIB_ERR_NONE) {
+          APP_LOGE(getName(), "[%s] transmitFlag failed, code %d", timeStr, transmissionState);
+        } else {
+          APP_LOGI(getName(), "[%s] TX done", timeStr);
         }
       }
+
+      if (rxEnable) {
+        int state = startRX(RADIOLIB_SX127X_RXCONTINUOUS);
+        if (state != RADIOLIB_ERR_NONE) {
+          APP_LOGE(getName(), "[%s] startRX failed, code %d", timeStr, state);
+          rxEnable = false;
+        }
+      }
+
+      delete msg;
+
+    } else {
+      // No member woken up
     }
   }
-
-  return true;
 }
 
 int16_t RadiolibTask::startRX(uint8_t mode) {
@@ -217,7 +249,7 @@ int16_t RadiolibTask::startRX(uint8_t mode) {
       return state;
     }
   }
-
+  taskToNotify = NULL;
   return radio->startReceive(0, mode);
 }
 
@@ -230,6 +262,6 @@ int16_t RadiolibTask::startTX(String &str) {
   }
 
   transmissionState = radio->startTransmit(str);
-  transmitFlag      = true;
+  taskToNotify      = handle;
   return RADIOLIB_ERR_NONE;
 }
