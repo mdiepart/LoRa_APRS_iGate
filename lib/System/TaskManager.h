@@ -3,7 +3,6 @@
 
 #include <Arduino.h>
 #include <BoardFinder.h>
-#include <Display.h>
 #include <configuration.h>
 #include <freertos/FreeRTOS.h>
 #include <list>
@@ -19,7 +18,7 @@ enum TaskDisplayState {
 
 class FreeRTOSTask {
 public:
-  FreeRTOSTask(const String &name, int taskId, UBaseType_t priority, uint32_t stackDepth = configMINIMAL_STACK_SIZE, BaseType_t coreId = -1);
+  FreeRTOSTask(const String &name, int taskId, UBaseType_t priority, uint32_t stackDepth = configMINIMAL_STACK_SIZE, BaseType_t coreId = -1, const bool displayOnScreen = true);
   ~FreeRTOSTask();
 
   xTaskHandle handle;
@@ -44,6 +43,10 @@ public:
 
   bool start();
 
+  bool getDisplayOnScreen() const {
+    return _displayOnScreen;
+  }
+
 protected:
   TaskDisplayState _state;
   String           _stateInfo;
@@ -56,6 +59,7 @@ private:
   UBaseType_t _priority;
   uint32_t    _stackDepth;
   BaseType_t  _coreId;
+  bool        _displayOnScreen;
 };
 
 class TaskManager {
@@ -71,19 +75,5 @@ public:
 private:
   std::list<FreeRTOSTask *> _FreeRTOSTasks;
 };
-
-class StatusFrame : public DisplayFrame {
-public:
-  explicit StatusFrame(const std::list<FreeRTOSTask *> &tasks) : _tasks(tasks) {
-  }
-  virtual ~StatusFrame() {
-  }
-  void drawStatusPage(Bitmap &bitmap) override;
-
-private:
-  std::list<FreeRTOSTask *> _tasks;
-};
-
-#include "System.h"
 
 #endif

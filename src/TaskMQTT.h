@@ -8,7 +8,7 @@
 
 class MQTTTask : public FreeRTOSTask {
 public:
-  MQTTTask(UBaseType_t priority, BaseType_t coreId, System &system, QueueHandle_t &toMQTT);
+  MQTTTask(UBaseType_t priority, BaseType_t coreId, const bool displayOnScreen, System &system, QueueHandle_t &toMQTT);
 
   void worker() override;
 

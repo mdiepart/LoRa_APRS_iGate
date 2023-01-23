@@ -1,12 +1,13 @@
 #include <WiFi.h>
 #include <logger.h>
 
+#include "System.h"
 #include "Task.h"
 #include "TaskEth.h"
 #include "TaskWifi.h"
 #include "project_configuration.h"
 
-WifiTask::WifiTask(UBaseType_t priority, BaseType_t coreId, System &system) : FreeRTOSTask(TASK_WIFI, TaskWifi, priority, 2048 + 4096, coreId), _system(system), _wiFiMulti(), _oldWifiStatus(WL_DISCONNECTED) {
+WifiTask::WifiTask(UBaseType_t priority, BaseType_t coreId, const bool displayOnScreen, System &system) : FreeRTOSTask(TASK_WIFI, TaskWifi, priority, 2048 + 4096, coreId, displayOnScreen), _system(system), _wiFiMulti(), _oldWifiStatus(WL_DISCONNECTED) {
   start();
 }
 

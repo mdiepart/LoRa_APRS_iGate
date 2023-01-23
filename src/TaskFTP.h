@@ -6,7 +6,7 @@
 
 class FTPTask : public FreeRTOSTask {
 public:
-  FTPTask(UBaseType_t priority, BaseType_t coreId, System &system);
+  FTPTask(UBaseType_t priority, BaseType_t coreId, const bool displayOnScreen, System &system);
 
   void worker() override;
 

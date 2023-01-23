@@ -7,7 +7,7 @@ void NetworkEvent(WiFiEvent_t event);
 
 class EthTask : public FreeRTOSTask {
 public:
-  EthTask(UBaseType_t priority, BaseType_t coreId, System &system);
+  EthTask(UBaseType_t priority, BaseType_t coreId, const bool displayOnScreen, System &system);
   virtual ~EthTask();
 
   void worker() override;

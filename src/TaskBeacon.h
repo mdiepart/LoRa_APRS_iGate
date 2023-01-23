@@ -1,22 +1,24 @@
 #ifndef TASK_BEACON_H_
 #define TASK_BEACON_H_
 
-#include <OneButton.h>
-#include <TinyGPS++.h>
-
 #include <APRSMessage.h>
+#include <OneButton.h>
 #include <TaskMQTT.h>
 #include <TaskManager.h>
+#include <TinyGPS++.h>
+
+#include "Timer.h"
 
 class BeaconTask : public FreeRTOSTask {
 public:
-  BeaconTask(UBaseType_t priority, BaseType_t coreId, System &system, QueueHandle_t &toModem, QueueHandle_t &toAprsIs);
+  BeaconTask(UBaseType_t priority, BaseType_t coreId, const bool displayOnScreen, System &system, QueueHandle_t &toModem, QueueHandle_t &toAprsIs, QueueHandle_t &toDisplay);
 
   void worker() override;
 
 private:
   QueueHandle_t &_toModem;
   QueueHandle_t &_toAprsIs;
+  QueueHandle_t &_toDisplay;
 
   APRSMessage _beaconMsg;
   Timer       _beacon_timer;

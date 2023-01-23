@@ -6,7 +6,7 @@
 
 class RouterTask : public FreeRTOSTask {
 public:
-  RouterTask(UBaseType_t priority, BaseType_t coreId, System &system, QueueHandle_t &fromModem, QueueHandle_t &toModem, QueueHandle_t &toAprsIs, QueueHandle_t &toMQTT);
+  RouterTask(UBaseType_t priority, BaseType_t coreId, const bool displayOnScreen, System &system, QueueHandle_t &fromModem, QueueHandle_t &toModem, QueueHandle_t &toAprsIs, QueueHandle_t &toMQTT);
   virtual ~RouterTask();
 
   void worker() override;

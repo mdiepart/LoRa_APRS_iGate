@@ -5,7 +5,6 @@
 #include "TaskManager.h"
 
 #include <BoardFinder.h>
-#include <Display.h>
 #include <configuration.h>
 #include <logger.h>
 #include <memory>
@@ -23,7 +22,6 @@ public:
   BoardConfig const *const   getBoardConfig() const;
   Configuration const *const getUserConfig() const;
   TaskManager               &getTaskManager();
-  Display                   &getDisplay();
   bool                       isWifiOrEthConnected() const;
   void                       connectedViaEth(bool status);
   void                       connectedViaWifi(bool status);
@@ -34,7 +32,6 @@ private:
   BoardConfig const   *_boardConfig;
   Configuration const *_userConfig;
   TaskManager          _taskManager;
-  Display              _display;
   bool                 _isEthConnected;
   bool                 _isWifiConnected;
   PacketLoggerTask    *_packetLogger;

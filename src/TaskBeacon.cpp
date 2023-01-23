@@ -4,8 +4,10 @@
 #include <functional>
 #include <logger.h>
 
+#include "System.h"
 #include "Task.h"
 #include "TaskBeacon.h"
+#include "TaskDisplay.h"
 #include "project_configuration.h"
 
 OneButton         BeaconTask::_userButton;
@@ -15,7 +17,8 @@ uint              BeaconTask::_instances;
 TaskHandle_t      beaconTaskhandle = NULL;
 SemaphoreHandle_t buttonSemaphore;
 
-BeaconTask::BeaconTask(UBaseType_t priority, BaseType_t coreId, System &system, QueueHandle_t &toModem, QueueHandle_t &toAprsIs) : FreeRTOSTask(TASK_BEACON, TaskBeacon, priority, 2048, coreId), _toModem(toModem), _toAprsIs(toAprsIs), _system(system), _ss(1), _useGps(false) /*, _beaconMsgReady(false), _aprsBeaconSent(false)*/, _lastBeaconSentTime(0), _beaconPeriod(pdMS_TO_TICKS(_system.getUserConfig()->beacon.timeout * 60 * 1000)), _fast_pace_start_time(0) {
+BeaconTask::BeaconTask(UBaseType_t priority, BaseType_t coreId, const bool displayOnScreen, System &system, QueueHandle_t &toModem, QueueHandle_t &toAprsIs, QueueHandle_t &toDisplay)
+    : FreeRTOSTask(TASK_BEACON, TaskBeacon, priority, 2048, coreId, displayOnScreen), _toModem(toModem), _toAprsIs(toAprsIs), _toDisplay(toDisplay), _system(system), _ss(1), _useGps(false) /*, _beaconMsgReady(false), _aprsBeaconSent(false)*/, _lastBeaconSentTime(0), _beaconPeriod(pdMS_TO_TICKS(_system.getUserConfig()->beacon.timeout * 60 * 1000)), _fast_pace_start_time(0) {
   start();
 }
 
@@ -89,7 +92,8 @@ void BeaconTask::worker() {
         localtime_r(&now, &timeInfo);
         strftime(timeStr, 9, "%T", &timeInfo);
         APP_LOGI(getName(), "[IP Beacon][%s] %s", timeStr, _beaconMsg.encode().c_str());
-        _system.getDisplay().addFrame(std::shared_ptr<DisplayFrame>(new TextFrame("IP BEACON", _beaconMsg.toString())));
+        TextFrame *frame = new TextFrame("IP BEACON", _beaconMsg.toString());
+        xQueueSendToBack(_toDisplay, &frame, pdMS_TO_TICKS(100));
 
         // Wait at least 30s before RF
         if (_system.getUserConfig()->digi.beacon) {
@@ -106,7 +110,8 @@ void BeaconTask::worker() {
         localtime_r(&now, &timeInfo);
         strftime(timeStr, 9, "%T", &timeInfo);
         APP_LOGI(getName(), "[RF Beacon][%s] %s", timeStr, _beaconMsg.encode().c_str());
-        _system.getDisplay().addFrame(std::shared_ptr<DisplayFrame>(new TextFrame("RF BEACON", _beaconMsg.toString())));
+        TextFrame *frame = new TextFrame("RF BEACON", _beaconMsg.toString());
+        xQueueSendToBack(_toDisplay, &frame, pdMS_TO_TICKS(100));
       }
       _stateInfo   = "Beacon Sent";
       _send_update = false;
@@ -126,7 +131,7 @@ void BeaconTask::worker() {
       now += ((ticksLeft + 999) / 1000);
       localtime_r(&now, &timeInfo);
       strftime(timeStr, sizeof(timeStr), "%T", &timeInfo);
-      _stateInfo = String("Next @ ") + timeStr;
+      _stateInfo = String("Next @") + timeStr;
       if (xSemaphoreTake(buttonSemaphore, ticksLeft) == pdTRUE) {
         // Semaphore was obtained. That means that the button was pressed.
         _fast_pace            = true;

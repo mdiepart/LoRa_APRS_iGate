@@ -1,10 +1,11 @@
 #include <logger.h>
 
+#include "System.h"
 #include "Task.h"
 #include "TaskAprsIs.h"
 #include "project_configuration.h"
 
-AprsIsTask::AprsIsTask(UBaseType_t priority, BaseType_t coreId, System &system, QueueHandle_t &toAprsIs) : FreeRTOSTask(TASK_APRS_IS, TaskAprsIs, priority, 2048, coreId), _toAprsIs(toAprsIs), _system(system) {
+AprsIsTask::AprsIsTask(UBaseType_t priority, BaseType_t coreId, const bool displayOnScreen, System &system, QueueHandle_t &toAprsIs) : FreeRTOSTask(TASK_APRS_IS, TaskAprsIs, priority, 2048, coreId, displayOnScreen), _toAprsIs(toAprsIs), _system(system) {
   start();
 }
 

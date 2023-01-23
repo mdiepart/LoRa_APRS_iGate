@@ -2,6 +2,7 @@
 #include <WiFi.h>
 #include <logger.h>
 
+#include "System.h"
 #include "Task.h"
 #include "TaskEth.h"
 #include "project_configuration.h"
@@ -64,7 +65,7 @@ void NetworkEvent(WiFiEvent_t event) {
   }
 }
 
-EthTask::EthTask(UBaseType_t priority, BaseType_t coreId, System &system) : FreeRTOSTask(TASK_ETH, TaskEth, priority, 2048, coreId), _system(system) {
+EthTask::EthTask(UBaseType_t priority, BaseType_t coreId, const bool displayOnScreen, System &system) : FreeRTOSTask(TASK_ETH, TaskEth, priority, 2048, coreId, displayOnScreen), _system(system) {
   start();
 }
 

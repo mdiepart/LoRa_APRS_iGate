@@ -7,11 +7,12 @@
 #include <queue>
 #include <string>
 
+#include "System.h"
 #include "Task.h"
 #include "TaskPacketLogger.h"
 #include "project_configuration.h"
 
-PacketLoggerTask::PacketLoggerTask(UBaseType_t priority, BaseType_t coreId, System &system, const String filename, QueueHandle_t &toPacketLogger) : FreeRTOSTask(TASK_PACKET_LOGGER, TaskPacketLogger, priority, 3072, coreId), _counter(0), _curr_tail_length(0), _total_count(0), _filename(filename), _tail(""), _system(system), _toPacketLogger(toPacketLogger) {
+PacketLoggerTask::PacketLoggerTask(UBaseType_t priority, BaseType_t coreId, const bool displayOnScreen, System &system, const String filename, QueueHandle_t &toPacketLogger) : FreeRTOSTask(TASK_PACKET_LOGGER, TaskPacketLogger, priority, 3072, coreId, displayOnScreen), _counter(0), _curr_tail_length(0), _total_count(0), _filename(filename), _tail(""), _system(system), _toPacketLogger(toPacketLogger) {
   _nb_lines        = _system.getUserConfig()->packetLogger.nb_lines;
   _nb_files        = _system.getUserConfig()->packetLogger.nb_files;
   _max_tail_length = std::min<size_t>(system.getUserConfig()->packetLogger.tail_length, _nb_lines);

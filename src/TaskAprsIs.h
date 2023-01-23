@@ -7,7 +7,7 @@
 
 class AprsIsTask : public FreeRTOSTask {
 public:
-  explicit AprsIsTask(UBaseType_t priority, BaseType_t coreId, System &system, QueueHandle_t &toAprsIs);
+  explicit AprsIsTask(UBaseType_t priority, BaseType_t coreId, const bool displayOnScreen, System &system, QueueHandle_t &toAprsIs);
   virtual ~AprsIsTask();
 
   void worker() override;

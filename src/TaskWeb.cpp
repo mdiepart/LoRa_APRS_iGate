@@ -11,7 +11,7 @@
 #include "TaskWeb.h"
 #include "project_configuration.h"
 
-WebTask::WebTask(UBaseType_t priority, BaseType_t coreId, System &system) : FreeRTOSTask(TASK_WEB, TaskWeb, priority, 8192, coreId), http_server(80), _system(system) {
+WebTask::WebTask(UBaseType_t priority, BaseType_t coreId, const bool displayOnScreen, System &system) : FreeRTOSTask(TASK_WEB, TaskWeb, priority, 8192, coreId, displayOnScreen), http_server(80), _system(system) {
   start();
 }
 

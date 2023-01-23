@@ -2,6 +2,9 @@
 #include <ctime>
 #include <logger.h>
 
+#include "System.h"
+#include "Task.h"
+#include "TaskDisplay.h"
 #include "TaskPacketLogger.h"
 #include "TaskRadiolib.h"
 
@@ -22,7 +25,8 @@ static void radioCallback() {
   }
 }
 
-RadiolibTask::RadiolibTask(UBaseType_t priority, BaseType_t coreId, System &system, QueueHandle_t &fromModem, QueueHandle_t &toModem, QueueHandle_t &toPacketLogger) : FreeRTOSTask(TASK_RADIOLIB, TaskRadiolib, priority, 2560, coreId), module(NULL), radio(NULL), _system(system), config(system.getUserConfig()->lora), rxEnable(true), txEnable(config.tx_enable), _fromModem(fromModem), _toModem(toModem), _toPacketLogger(toPacketLogger) {
+RadiolibTask::RadiolibTask(UBaseType_t priority, BaseType_t coreId, const bool displayOnScreen, System &system, QueueHandle_t &fromModem, QueueHandle_t &toModem, QueueHandle_t &toPacketLogger, QueueHandle_t &toDisplay)
+    : FreeRTOSTask(TASK_RADIOLIB, TaskRadiolib, priority, 2560, coreId, displayOnScreen), module(NULL), radio(NULL), _system(system), config(system.getUserConfig()->lora), rxEnable(true), txEnable(config.tx_enable), _fromModem(fromModem), _toModem(toModem), _toPacketLogger(toPacketLogger), _toDisplay(toDisplay) {
   start();
 }
 
@@ -166,7 +170,8 @@ void RadiolibTask::worker() {
 
           APRSMessage *loggerMsg = new APRSMessage(*modemMsg);
 
-          _system.getDisplay().addFrame(std::shared_ptr<DisplayFrame>(new TextFrame("LoRa", modemMsg->toString().c_str())));
+          TextFrame *frame = new TextFrame("LoRa", modemMsg->toString().c_str());
+          xQueueSendToBack(_toDisplay, &frame, pdTICKS_TO_MS(100));
 
           logEntry log(loggerMsg, now, radio->getRSSI(), radio->getSNR(), radio->getFrequencyError());
 

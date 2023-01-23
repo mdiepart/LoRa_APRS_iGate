@@ -7,7 +7,7 @@
 
 class OTATask : public FreeRTOSTask {
 public:
-  OTATask(UBaseType_t priority, BaseType_t coreId, System &system);
+  OTATask(UBaseType_t priority, BaseType_t coreId, const bool displayOnScreen, System &system);
   virtual ~OTATask();
 
   void worker() override;

@@ -2,11 +2,12 @@
 #include <SPIFFS.h>
 #include <logger.h>
 
+#include "System.h"
 #include "Task.h"
 #include "TaskFTP.h"
 #include "project_configuration.h"
 
-FTPTask::FTPTask(UBaseType_t priority, BaseType_t coreId, System &system) : FreeRTOSTask(TASK_FTP, TaskFtp, priority, 9216, coreId), _system(system) {
+FTPTask::FTPTask(UBaseType_t priority, BaseType_t coreId, const bool displayOnScreen, System &system) : FreeRTOSTask(TASK_FTP, TaskFtp, priority, 9216, coreId, displayOnScreen), _system(system) {
   /* File buffer inside FTP server is 4096 bytes.*/
   start();
 }

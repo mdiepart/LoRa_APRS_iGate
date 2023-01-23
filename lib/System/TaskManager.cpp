@@ -15,31 +15,7 @@ std::list<FreeRTOSTask *> TaskManager::getFreeRTOSTasks() {
   return _FreeRTOSTasks;
 }
 
-// cppcheck-suppress unusedFunction
-void StatusFrame::drawStatusPage(Bitmap &bitmap) {
-  int y = 0;
-  for (FreeRTOSTask *task : _tasks) {
-    int x = bitmap.drawString(0, y, (String(task->getName())).substring(0, String(task->getName()).indexOf("Task")));
-    x     = bitmap.drawString(x, y, ": ");
-    if (task->getStateInfo() == "") {
-      switch (task->getState()) {
-      case Error:
-        bitmap.drawString(x, y, "Error");
-        break;
-      case Warning:
-        bitmap.drawString(x, y, "Warning");
-      default:
-        break;
-      }
-      bitmap.drawString(x, y, "Okay");
-    } else {
-      bitmap.drawString(x, y, task->getStateInfo());
-    }
-    y += getSystemFont()->heightInPixel;
-  }
-}
-
-FreeRTOSTask::FreeRTOSTask(const String &name, int taskId, UBaseType_t priority, uint32_t stackDepth, BaseType_t coreId) : _state(Okay), _stateInfo("Booting"), taskStarted(false), _name(name), _taskId(taskId), _priority(priority), _stackDepth(stackDepth), _coreId(coreId) {
+FreeRTOSTask::FreeRTOSTask(const String &name, int taskId, UBaseType_t priority, uint32_t stackDepth, BaseType_t coreId, const bool displayOnScreen) : _state(Okay), _stateInfo("Booting"), taskStarted(false), _name(name), _taskId(taskId), _priority(priority), _stackDepth(stackDepth), _coreId(coreId), _displayOnScreen(displayOnScreen) {
 }
 
 FreeRTOSTask::~FreeRTOSTask() {

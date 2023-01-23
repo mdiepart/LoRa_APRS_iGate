@@ -32,6 +32,7 @@ QueueHandle_t fromModem;
 QueueHandle_t toModem;
 QueueHandle_t toMQTT;
 QueueHandle_t toPacketLogger;
+QueueHandle_t toDisplay;
 
 System        LoRaSystem;
 Configuration userConfig;
@@ -150,61 +151,62 @@ void setup() {
   fromModem      = xQueueCreate(10, sizeof(APRSMessage *));
   toMQTT         = xQueueCreate(10, sizeof(APRSMessage *));
   toPacketLogger = xQueueCreate(10, sizeof(logEntry));
+  toDisplay      = xQueueCreate(10, sizeof(TextFrame *));
 
   LoRaSystem.setBoardConfig(boardConfig);
   LoRaSystem.setUserConfig(&userConfig);
-  displayTask = new DisplayTask(1, 0, LoRaSystem);
+  displayTask = new DisplayTask(1, 0, true, LoRaSystem, toDisplay, VERSION);
   LoRaSystem.getTaskManager().addFreeRTOSTask(displayTask);
 
-  modemTask = new RadiolibTask(5, 0, LoRaSystem, fromModem, toModem, toPacketLogger);
+  modemTask = new RadiolibTask(5, 0, false, LoRaSystem, fromModem, toModem, toPacketLogger, toDisplay);
   LoRaSystem.getTaskManager().addFreeRTOSTask(modemTask);
-  routerTask = new RouterTask(4, 0, LoRaSystem, fromModem, toModem, toAprsIs, toMQTT);
+  routerTask = new RouterTask(4, 0, false, LoRaSystem, fromModem, toModem, toAprsIs, toMQTT);
   LoRaSystem.getTaskManager().addFreeRTOSTask(routerTask);
-  beaconTask = new BeaconTask(3, 0, LoRaSystem, toModem, toAprsIs);
+  beaconTask = new BeaconTask(3, 0, true, LoRaSystem, toModem, toAprsIs, toDisplay);
   LoRaSystem.getTaskManager().addFreeRTOSTask(beaconTask);
 
   bool tcpip = false;
 
   if (userConfig.wifi.active) {
-    wifiTask = new WifiTask(6, 0, LoRaSystem);
+    wifiTask = new WifiTask(6, 0, true, LoRaSystem);
     LoRaSystem.getTaskManager().addFreeRTOSTask(wifiTask);
     tcpip = true;
   }
   if (boardConfig->Type == eETH_BOARD) {
-    ethTask = new EthTask(6, 0, LoRaSystem);
+    ethTask = new EthTask(6, 0, true, LoRaSystem);
     LoRaSystem.getTaskManager().addFreeRTOSTask(ethTask);
     tcpip = true;
   }
 
   if (tcpip) {
     if (LoRaSystem.getUserConfig()->ota.active) {
-      otaTask = new OTATask(4, 1, LoRaSystem);
+      otaTask = new OTATask(4, 1, true, LoRaSystem);
       LoRaSystem.getTaskManager().addFreeRTOSTask(otaTask);
     }
 
     if (userConfig.ftp.active) {
-      ftpTask = new FTPTask(1, 1, LoRaSystem);
+      ftpTask = new FTPTask(1, 1, false, LoRaSystem);
       LoRaSystem.getTaskManager().addFreeRTOSTask(ftpTask);
     }
 
     if (userConfig.aprs_is.active) {
-      aprsIsTask = new AprsIsTask(4, 0, LoRaSystem, toAprsIs);
+      aprsIsTask = new AprsIsTask(4, 0, true, LoRaSystem, toAprsIs);
       LoRaSystem.getTaskManager().addFreeRTOSTask(aprsIsTask);
     }
 
     if (userConfig.mqtt.active) {
-      mqttTask = new MQTTTask(4, 0, LoRaSystem, toMQTT);
+      mqttTask = new MQTTTask(4, 0, true, LoRaSystem, toMQTT);
       LoRaSystem.getTaskManager().addFreeRTOSTask(mqttTask);
     }
 
     if (userConfig.web.active) {
-      webTask = new WebTask(3, 1, LoRaSystem);
+      webTask = new WebTask(3, 1, true, LoRaSystem);
       LoRaSystem.getTaskManager().addFreeRTOSTask(webTask);
     }
   }
 
   if (userConfig.packetLogger.active) {
-    packetLoggerTask = new PacketLoggerTask(2, 1, LoRaSystem, "packets.log", toPacketLogger);
+    packetLoggerTask = new PacketLoggerTask(2, 1, true, LoRaSystem, "packets.log", toPacketLogger);
     LoRaSystem.getTaskManager().addFreeRTOSTask(packetLoggerTask);
     LoRaSystem.setPacketLogger(packetLoggerTask);
   }
@@ -219,17 +221,15 @@ void setup() {
     sntp_init();
   }
 
-  LoRaSystem.getDisplay().showSpashScreen("LoRa APRS iGate", VERSION);
-
   if (userConfig.callsign == "NOCALL-10") {
     APP_LOGE(MODULE_NAME, "You have to change your settings in 'data/is-cfg.json' and upload it via 'Upload File System image'!");
-    LoRaSystem.getDisplay().showStatusScreen("ERROR", "You have to change your settings in 'data/is-cfg.json' and upload it via \"Upload File System image\"!");
+    // LoRaSystem.getDisplay().showStatusScreen("ERROR", "You have to change your settings in 'data/is-cfg.json' and upload it via \"Upload File System image\"!");
     while (true)
       ;
   }
   if ((!userConfig.aprs_is.active) && !(userConfig.digi.active)) {
     APP_LOGE(MODULE_NAME, "No mode selected (iGate or Digi)! You have to activate one of iGate or Digi.");
-    LoRaSystem.getDisplay().showStatusScreen("ERROR", "No mode selected (iGate or Digi)! You have to activate one of iGate or Digi.");
+    // LoRaSystem.getDisplay().showStatusScreen("ERROR", "No mode selected (iGate or Digi)! You have to activate one of iGate or Digi.");
     while (true)
       ;
   }

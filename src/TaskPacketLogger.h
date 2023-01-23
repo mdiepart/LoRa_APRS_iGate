@@ -13,7 +13,7 @@
 class PacketLoggerTask : public FreeRTOSTask {
 
 public:
-  PacketLoggerTask(UBaseType_t priority, BaseType_t coreId, System &system, const String filename, QueueHandle_t &queueHandle);
+  PacketLoggerTask(UBaseType_t priority, BaseType_t coreId, const bool displayOnScreen, System &system, const String filename, QueueHandle_t &queueHandle);
   virtual ~PacketLoggerTask();
 
   void worker() override;

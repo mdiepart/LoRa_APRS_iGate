@@ -1,8 +1,7 @@
-
 #include "System.h"
 #include "../../src/TaskPacketLogger.h"
 
-System::System() : _boardConfig(0), _userConfig(0), _taskManager(), _display(), _isEthConnected(false), _isWifiConnected(false), _packetLogger(NULL) {
+System::System() : _boardConfig(0), _userConfig(0), _taskManager(), _isEthConnected(false), _isWifiConnected(false), _packetLogger(NULL) {
 }
 
 System::~System() {
@@ -26,10 +25,6 @@ Configuration const *const System::getUserConfig() const {
 
 TaskManager &System::getTaskManager() {
   return _taskManager;
-}
-
-Display &System::getDisplay() {
-  return _display;
 }
 
 bool System::isWifiOrEthConnected() const {

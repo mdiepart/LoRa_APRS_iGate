@@ -8,7 +8,7 @@
 
 class WebTask : public FreeRTOSTask {
 public:
-  WebTask(UBaseType_t priority, BaseType_t coreId, System &system);
+  WebTask(UBaseType_t priority, BaseType_t coreId, const bool displayOnScreen, System &system);
   virtual ~WebTask();
 
   void worker() override;

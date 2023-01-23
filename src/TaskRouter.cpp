@@ -1,11 +1,12 @@
 #include <logger.h>
 
+#include "System.h"
 #include "Task.h"
 #include "TaskMQTT.h"
 #include "TaskRouter.h"
 #include "project_configuration.h"
 
-RouterTask::RouterTask(UBaseType_t priority, BaseType_t coreId, System &system, QueueHandle_t &fromModem, QueueHandle_t &toModem, QueueHandle_t &toAprsIs, QueueHandle_t &toMQTT) : FreeRTOSTask(TASK_ROUTER, TaskRouter, priority, 2048, coreId), _system(system), _fromModem(fromModem), _toModem(toModem), _toAprsIs(toAprsIs), _toMQTT(toMQTT) {
+RouterTask::RouterTask(UBaseType_t priority, BaseType_t coreId, const bool displayOnScreen, System &system, QueueHandle_t &fromModem, QueueHandle_t &toModem, QueueHandle_t &toAprsIs, QueueHandle_t &toMQTT) : FreeRTOSTask(TASK_ROUTER, TaskRouter, priority, 2048, coreId, displayOnScreen), _system(system), _fromModem(fromModem), _toModem(toModem), _toAprsIs(toAprsIs), _toMQTT(toMQTT) {
   start();
 }
 

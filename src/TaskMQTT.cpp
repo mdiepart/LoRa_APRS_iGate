@@ -1,11 +1,12 @@
 #include <ArduinoJson.h>
 #include <logger.h>
 
+#include "System.h"
 #include "Task.h"
 #include "TaskMQTT.h"
 #include "project_configuration.h"
 
-MQTTTask::MQTTTask(UBaseType_t priority, BaseType_t coreId, System &system, QueueHandle_t &toMQTT) : FreeRTOSTask(TASK_MQTT, TaskMQTT, priority, 3072, coreId), _system(system), _toMQTT(toMQTT), _MQTT(_client) {
+MQTTTask::MQTTTask(UBaseType_t priority, BaseType_t coreId, const bool displayOnScreen, System &system, QueueHandle_t &toMQTT) : FreeRTOSTask(TASK_MQTT, TaskMQTT, priority, 3072, coreId, displayOnScreen), _system(system), _toMQTT(toMQTT), _MQTT(_client) {
   start();
   APP_LOGI(getName(), "MQTT class created.");
 }

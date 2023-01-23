@@ -7,7 +7,7 @@
 #include "TaskOTA.h"
 #include "project_configuration.h"
 
-OTATask::OTATask(UBaseType_t priority, BaseType_t coreId, System &system) : FreeRTOSTask(TASK_OTA, TaskOta, priority, 2048, coreId), _ota(), _beginCalled(false), _status(OTA_Disabled), _system(system), _enable_time(0), _timeout(0) {
+OTATask::OTATask(UBaseType_t priority, BaseType_t coreId, const bool displayOnScreen, System &system) : FreeRTOSTask(TASK_OTA, TaskOta, priority, 2048, coreId), _ota(), _beginCalled(false), _status(OTA_Disabled), _system(system), _enable_time(0), _timeout(0) {
   start();
 }
 

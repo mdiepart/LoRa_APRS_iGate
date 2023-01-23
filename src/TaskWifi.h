@@ -6,7 +6,7 @@
 
 class WifiTask : public FreeRTOSTask {
 public:
-  WifiTask(UBaseType_t priority, BaseType_t coreId, System &system);
+  WifiTask(UBaseType_t priority, BaseType_t coreId, const bool displayOnScreen, System &system);
 
   void worker() override;
 
