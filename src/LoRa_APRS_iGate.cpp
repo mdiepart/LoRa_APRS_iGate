@@ -24,9 +24,6 @@
 #define VERSION     "23.01.0"
 #define MODULE_NAME "Main"
 
-String create_lat_aprs(double lat);
-String create_long_aprs(double lng);
-
 QueueHandle_t toAprsIs;
 QueueHandle_t fromModem;
 QueueHandle_t toModem;
