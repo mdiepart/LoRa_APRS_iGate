@@ -1,7 +1,5 @@
 #include <SPIFFS.h>
 
-#include <logger.h>
-
 #include "project_configuration.h"
 
 void ProjectConfigurationManagement::readProjectConfiguration(DynamicJsonDocument &data, Configuration &conf) {
@@ -103,6 +101,37 @@ void ProjectConfigurationManagement::readProjectConfiguration(DynamicJsonDocumen
     conf.syslog.server = data["syslog"]["server"].as<String>();
   conf.syslog.port = data["syslog"]["port"] | 514;
 
+  if (data.containsKey("webserver")) {
+    if (data["webserver"].containsKey("active"))
+      conf.web.active = data["webserver"]["active"] | false;
+    if (data["webserver"].containsKey("port"))
+      conf.web.port = data["webserver"]["port"] | 80;
+    if (data["webserver"].containsKey("password"))
+      conf.web.password = data["webserver"]["password"] | "";
+  }
+
+  if (data.containsKey("OTA")) {
+    if (data["OTA"].containsKey("active"))
+      conf.ota.active = data["OTA"]["active"] | false;
+    if (data["OTA"].containsKey("port"))
+      conf.ota.port = data["OTA"]["port"] | 3232;
+    if (data["OTA"].containsKey("password"))
+      conf.ota.password = data["OTA"]["password"] | "";
+    if (data["OTA"].containsKey("enableViaWeb"))
+      conf.ota.enableViaWeb = data["OTA"]["enableViaWeb"] | false;
+  }
+
+  if (data.containsKey("packet_logger")) {
+    if (data["packet_logger"].containsKey("active"))
+      conf.packetLogger.active = data["packet_logger"]["active"] | true;
+    if (data["packet_logger"].containsKey("number_lines"))
+      conf.packetLogger.nb_lines = data["packet_logger"]["number_lines"] | 100;
+    if (data["packet_logger"].containsKey("files_history"))
+      conf.packetLogger.nb_files = data["packet_logger"]["files_history"] | 1;
+    if (data["packet_logger"].containsKey("tail_length"))
+      conf.packetLogger.tail_length = data["packet_logger"]["tail_length"] | 10;
+  }
+
   if (data.containsKey("ntp_server"))
     conf.ntpServer = data["ntp_server"].as<String>();
 
@@ -170,7 +199,22 @@ void ProjectConfigurationManagement::writeProjectConfiguration(Configuration &co
   data["syslog"]["active"] = conf.syslog.active;
   data["syslog"]["server"] = conf.syslog.server;
   data["syslog"]["port"]   = conf.syslog.port;
-  data["ntp_server"]       = conf.ntpServer;
+
+  data["webserver"]["active"]   = conf.web.active;
+  data["webserver"]["port"]     = conf.web.port;
+  data["webserver"]["password"] = conf.web.password;
+
+  data["OTA"]["active"]       = conf.ota.active;
+  data["OTA"]["port"]         = conf.ota.port;
+  data["OTA"]["password"]     = conf.ota.password;
+  data["OTA"]["enableViaWeb"] = conf.ota.enableViaWeb;
+
+  data["packet_logger"]["active"]        = conf.packetLogger.active;
+  data["packet_logger"]["number_lines"]  = conf.packetLogger.nb_lines;
+  data["packet_logger"]["files_history"] = conf.packetLogger.nb_files;
+  data["packet_logger"]["tail_length"]   = conf.packetLogger.tail_length;
+
+  data["ntp_server"] = conf.ntpServer;
 
   data["board"] = conf.board;
 }

@@ -3,7 +3,6 @@
 
 #include "project_configuration.h"
 #include <APRS-Decoder.h>
-#include <BoardFinder.h>
 #include <RadioLib.h>
 #include <TaskManager.h>
 

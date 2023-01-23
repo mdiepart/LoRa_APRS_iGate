@@ -16,10 +16,6 @@ bool WifiTask::setup(System &system) {
   // Don't save WiFi configuration in flash
   WiFi.persistent(false);
 
-  // Set WiFi to station mode
-  WiFi.mode(WIFI_STA);
-
-  WiFi.onEvent(WiFiEvent);
   if (system.getUserConfig()->network.hostname.overwrite) {
     WiFi.setHostname(system.getUserConfig()->network.hostname.name.c_str());
   } else {
@@ -30,8 +26,13 @@ bool WifiTask::setup(System &system) {
     WiFi.config(system.getUserConfig()->network.static_.ip, system.getUserConfig()->network.static_.gateway, system.getUserConfig()->network.static_.subnet, system.getUserConfig()->network.static_.dns1, system.getUserConfig()->network.static_.dns2);
   }
 
+  // Set WiFi to station mode
+  WiFi.mode(WIFI_STA);
+
+  WiFi.onEvent(WiFiEvent);
+
   for (Configuration::Wifi::AP ap : system.getUserConfig()->wifi.APs) {
-    system.getLogger().log(logging::LoggerLevel::LOGGER_LEVEL_DEBUG, getName(), "Looking for AP: %s", ap.SSID.c_str());
+    logger.debug(getName(), "Looking for AP: %s", ap.SSID.c_str());
     _wiFiMulti.addAP(ap.SSID.c_str(), ap.password.c_str());
   }
   return true;
@@ -41,13 +42,15 @@ bool WifiTask::loop(System &system) {
   const uint8_t wifi_status = _wiFiMulti.run();
   if (wifi_status != WL_CONNECTED) {
     system.connectedViaWifi(false);
-    system.getLogger().log(logging::LoggerLevel::LOGGER_LEVEL_ERROR, getName(), "WiFi not connected!");
+    if (wifi_status != _oldWifiStatus) {
+      logger.error(getName(), "WiFi not connected!");
+    }
     _oldWifiStatus = wifi_status;
     _stateInfo     = "WiFi not connected";
     _state         = Error;
     return false;
   } else if (wifi_status != _oldWifiStatus) {
-    system.getLogger().log(logging::LoggerLevel::LOGGER_LEVEL_DEBUG, getName(), "WiFi IP address: %s", WiFi.localIP().toString().c_str());
+    logger.debug(getName(), "WiFi IP address: %s", WiFi.localIP().toString().c_str());
     _oldWifiStatus = wifi_status;
     return false;
   }

@@ -1,7 +1,6 @@
-#include <logger.h>
-
 #include <OneButton.h>
 #include <TimeLib.h>
+#include <logger.h>
 
 #include "Task.h"
 #include "TaskBeacon.h"
@@ -34,7 +33,7 @@ bool BeaconTask::setup(System &system) {
     if (system.getBoardConfig()->GpsRx != 0) {
       _ss.begin(9600, SERIAL_8N1, system.getBoardConfig()->GpsTx, system.getBoardConfig()->GpsRx);
     } else {
-      system.getLogger().log(logging::LoggerLevel::LOGGER_LEVEL_INFO, getName(), "NO GPS found.");
+      logger.info(getName(), "NO GPS found.");
       _useGps = false;
     }
   }
@@ -72,30 +71,6 @@ bool BeaconTask::loop(System &system) {
   return true;
 }
 
-String create_lat_aprs(double lat) {
-  char str[20];
-  char n_s = 'N';
-  if (lat < 0) {
-    n_s = 'S';
-  }
-  lat = std::abs(lat);
-  sprintf(str, "%02d%05.2f%c", (int)lat, (lat - (double)((int)lat)) * 60.0, n_s);
-  String lat_str(str);
-  return lat_str;
-}
-
-String create_long_aprs(double lng) {
-  char str[20];
-  char e_w = 'E';
-  if (lng < 0) {
-    e_w = 'W';
-  }
-  lng = std::abs(lng);
-  sprintf(str, "%03d%05.2f%c", (int)lng, (lng - (double)((int)lng)) * 60.0, e_w);
-  String lng_str(str);
-  return lng_str;
-}
-
 bool BeaconTask::sendBeacon(System &system) {
   double lat = system.getUserConfig()->beacon.positionLatitude;
   double lng = system.getUserConfig()->beacon.positionLongitude;
@@ -108,9 +83,32 @@ bool BeaconTask::sendBeacon(System &system) {
       return false;
     }
   }
-  _beaconMsg->getBody()->setData(String("=") + create_lat_aprs(lat) + "L" + create_long_aprs(lng) + "&" + system.getUserConfig()->beacon.message);
 
-  system.getLogger().log(logging::LoggerLevel::LOGGER_LEVEL_INFO, getName(), "[%s] %s", timeString().c_str(), _beaconMsg->encode().c_str());
+  String   aprs_data = "!L";
+  uint32_t lat_91    = 380926 * (90.0 - lat);
+  uint32_t lng_91    = 190463 * (180.0 + lng);
+
+  aprs_data += String(char(33 + (lat_91 / 753571)));
+  lat_91 %= 753571;
+  aprs_data += String(char(33 + (lat_91 / 8281)));
+  lat_91 %= 8281;
+  aprs_data += String(char(33 + (lat_91 / 91)));
+  lat_91 %= 91;
+  aprs_data += String(char(33 + lat_91));
+
+  aprs_data += String(char(33 + (lng_91 / 753571)));
+  lng_91 %= 753571;
+  aprs_data += String(char(33 + (lng_91 / 8281)));
+  lng_91 %= 8281;
+  aprs_data += String(char(33 + (lng_91 / 91)));
+  lng_91 %= 91;
+  aprs_data += String(char(33 + lng_91));
+
+  aprs_data += "& sT"; // No course, speed, range or compression type byte
+
+  _beaconMsg->getBody()->setData(aprs_data + system.getUserConfig()->beacon.message);
+
+  logger.info(getName(), "[%s] %s", timeString().c_str(), _beaconMsg->encode().c_str());
 
   if (system.getUserConfig()->aprs_is.active) {
     _toAprsIs.addElement(_beaconMsg);

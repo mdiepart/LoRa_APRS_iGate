@@ -1,8 +1,8 @@
+#include <TimeLib.h>
 #include <logger.h>
 
-#include <TimeLib.h>
-
 #include "Task.h"
+#include "TaskMQTT.h"
 #include "TaskRouter.h"
 #include "project_configuration.h"
 
@@ -35,18 +35,18 @@ bool RouterTask::loop(System &system) {
 
         aprsIsMsg->setPath(path + "qAO," + system.getUserConfig()->callsign);
 
-        system.getLogger().log(logging::LoggerLevel::LOGGER_LEVEL_INFO, getName(), "APRS-IS: %s", aprsIsMsg->toString().c_str());
+        logger.info(getName(), "APRS-IS: %s", aprsIsMsg->toString().c_str());
         _toAprsIs.addElement(aprsIsMsg);
       } else {
-        system.getLogger().log(logging::LoggerLevel::LOGGER_LEVEL_INFO, getName(), "APRS-IS: no forward => RFonly");
+        logger.info(getName(), "APRS-IS: no forward => RFonly");
       }
     } else {
       if (!system.getUserConfig()->aprs_is.active) {
-        system.getLogger().log(logging::LoggerLevel::LOGGER_LEVEL_INFO, getName(), "APRS-IS: disabled");
+        logger.info(getName(), "APRS-IS: disabled");
       }
 
       if (modemMsg->getSource() == system.getUserConfig()->callsign) {
-        system.getLogger().log(logging::LoggerLevel::LOGGER_LEVEL_INFO, getName(), "APRS-IS: no forward => own packet received");
+        logger.info(getName(), "APRS-IS: no forward => own packet received");
       }
     }
 
@@ -59,7 +59,7 @@ bool RouterTask::loop(System &system) {
         // fixme
         digiMsg->setPath(system.getUserConfig()->callsign + "*");
 
-        system.getLogger().log(logging::LoggerLevel::LOGGER_LEVEL_INFO, getName(), "DIGI: %s", digiMsg->toString().c_str());
+        logger.info(getName(), "DIGI: %s", digiMsg->toString().c_str());
 
         _toModem.addElement(digiMsg);
       }

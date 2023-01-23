@@ -10,8 +10,7 @@
 
 #include <logger.h>
 
-enum BoardType
-{
+enum BoardType {
   eHELTEC_WIFI_LORA_32_V1,
   eHELTEC_WIFI_LORA_32_V2,
   eTTGO_LORA32_V1,
@@ -35,7 +34,6 @@ public:
   uint8_t OledScl;
   uint8_t OledAddr;
   uint8_t OledReset;
-
   uint8_t LoraSck;
   uint8_t LoraMiso;
   uint8_t LoraMosi;
@@ -54,16 +52,15 @@ class BoardFinder {
 public:
   explicit BoardFinder(const std::list<BoardConfig const *> &boardConfigs);
 
-  BoardConfig const *searchBoardConfig(logging::Logger &logger);
-
+  BoardConfig const *searchBoardConfig();
   BoardConfig const *getBoardConfig(String name);
 
 private:
   const std::list<BoardConfig const *> &_boardConfigs;
 
-  bool checkOledConfig(BoardConfig const *boardConfig, logging::Logger &logger);
+  bool checkOledConfig(BoardConfig const *boardConfig);
   bool checkModemConfig(BoardConfig const *boardConfig);
-  bool checkPowerConfig(BoardConfig const *boardConfig, logging::Logger &logger);
+  bool checkPowerConfig(BoardConfig const *boardConfig);
 };
 
 extern BoardConfig TTGO_LORA32_V1;

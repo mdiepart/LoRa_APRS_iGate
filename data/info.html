@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link href="/style.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.2/css/all.min.css" />
+    <!--Add a title-->
+    <title>LoRa iGate Web Server</title>
+</head>
+
+<body>
+    <div class="sidebar">
+        <a href="#HOME"><i class="fa fa-fw fa-home"></i> Home</a>
+        <a href="#STATUS"><i class="fas fa-comment-alt"></i> Status</a>
+        <a href="#LOGS"><i class="fa fa-fw fa-book"></i> Logs</a>
+        <a href="#OTA"><i class="fa fa-fw fa-wifi"></i> Enable OTA</a>
+        <a href="#FIRMWARE"><i class="fa fa-fw fa-wrench"></i> Update Firmware</a>
+    </div>
+    <div class="main">
+        <div class="container wrapper HOME" id="HOME">
+            <p><br></p>
+            <div class="title"><span>LoRa iGate Web Server:</span></div>
+            <p><br></p>
+            <p style="text-align: center; color: grey;">Connected to LoRa iGate $$CALLSIGN$$.</p>
+            <p><br></p>
+        </div>
+
+        <div class="container wrapper STATUS" id="STATUS">
+            <p><br></p>
+            <div class="title"><span>Status:</span></div>
+            <p><br></p>
+            $$TASKLIST$$
+            <p><br></p>
+        </div>
+        <div class="container wrapper LOGS" id="LOGS">
+            <p><br></p>
+            <div class="title"><span>Logs</span></div>
+            <p><br></p>
+            $$LOGSLIST$$
+            <p><br></p>
+            <a href="/packets.log" style="display: flex; align-items: center; justify-content: center;" class="row" download>
+                <i class="fa fa-fw fa-download"></i> Download logs
+            </a>
+            <p><br></p>
+        </div>
+        <div class="container wrapper OTA" id="OTA">
+            <p><br></p>
+            <div class="title"><span>Over the air:</span></div>
+            <form action="/enableOTA" method="post">
+                <!-- Put label for="Password in white-->
+                <label for="OTA_Password" style="color: white;">OTA Password:</label>
+                <div class="row">
+                    <i class="fas fa-lock"></i>
+                    <input type="password" id="OTA_Password" placeholder="Password" name="OTA_Password" required>
+                </div>
+
+                <div class="row button">
+                    <input type="submit" value="Enable OTA">
+                </div>
+            </form>
+        </div>
+
+        <div class="container wrapper OTA" id="FIRMWARE">
+            <p><br></p>
+            <div class="title"><span>Firmware Update:</span></div>
+            <form action="/uploadFW" method="post" enctype="multipart/form-data">
+                <label style="color: white;" for="Firmware_File">Firmware :</label><br>
+                <div class="container2">
+                    <div class="button-wrap">
+                        <label class="button2" for="Firmware_File">Upload Firmware</label>
+                        <input type="file" id="Firmware_File" name="Firmware_File"><br>
+                    </div>
+                </div>
+                <label style="color: white;" for="SPIFFS_File">SPIFFS :</label><br>
+                <div class="container2">
+                    <div class="button-wrap">
+                        <label class="button2" for="SPIFFS_File">Upload SPIFFS</label>
+                        <input type="file" id="SPIFFS_File" name="SPIFFS_File"><br>
+                    </div>
+                </div>
+                <div class="row button">
+                    <input type="submit" value="Upload">
+                </div>
+            </form>
+
+        </div>
+    </div>
+
+</body>
+
+</html>

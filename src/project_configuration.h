@@ -142,27 +142,62 @@ public:
     int    port;
   };
 
+  class Web {
+  public:
+    Web() : active(false), port(80), password("") {
+    }
+
+    bool   active;
+    int    port;
+    String password;
+  };
+
+  class OTA {
+  public:
+    OTA() : active(false), enableViaWeb(false), port(3232), password("") {
+    }
+
+    bool   active;
+    bool   enableViaWeb;
+    int    port;
+    String password;
+  };
+
+  class PacketLogger {
+  public:
+    PacketLogger() : active(true), nb_lines(100), nb_files(1), tail_length(10) {
+    }
+
+    bool         active;
+    unsigned int nb_lines;
+    unsigned int nb_files;
+    unsigned int tail_length;
+  };
+
   Configuration() : callsign("NOCALL-10"), ntpServer("pool.ntp.org"), board("") {
   }
 
-  String  callsign;
-  Network network;
-  Wifi    wifi;
-  Beacon  beacon;
-  APRS_IS aprs_is;
-  Digi    digi;
-  LoRa    lora;
-  Display display;
-  Ftp     ftp;
-  MQTT    mqtt;
-  Syslog  syslog;
-  String  ntpServer;
-  String  board;
+  String       callsign;
+  Network      network;
+  Wifi         wifi;
+  Beacon       beacon;
+  APRS_IS      aprs_is;
+  Digi         digi;
+  LoRa         lora;
+  Display      display;
+  Ftp          ftp;
+  MQTT         mqtt;
+  Syslog       syslog;
+  Web          web;
+  OTA          ota;
+  PacketLogger packetLogger;
+  String       ntpServer;
+  String       board;
 };
 
 class ProjectConfigurationManagement : public ConfigurationManagement {
 public:
-  explicit ProjectConfigurationManagement(logging::Logger &logger) : ConfigurationManagement(logger, "/is-cfg.json") {
+  explicit ProjectConfigurationManagement() : ConfigurationManagement("/is-cfg.json") {
   }
   virtual ~ProjectConfigurationManagement() {
   }

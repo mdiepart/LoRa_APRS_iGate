@@ -1,7 +1,9 @@
 
 #include "System.h"
+#include "../../src/TaskPacketLogger.h"
 
 System::System() : _boardConfig(0), _userConfig(0), _isEthConnected(false), _isWifiConnected(false) {
+  _packetLogger = NULL;
 }
 
 System::~System() {
@@ -43,6 +45,10 @@ void System::connectedViaWifi(bool status) {
   _isWifiConnected = status;
 }
 
-logging::Logger &System::getLogger() {
-  return _logger;
+void System::setPacketLogger(PacketLoggerTask *task) {
+  _packetLogger = task;
+}
+
+PacketLoggerTask *System::getPacketLogger() {
+  return _packetLogger;
 }
