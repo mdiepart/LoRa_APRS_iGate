@@ -135,6 +135,11 @@ void ProjectConfigurationManagement::readProjectConfiguration(DynamicJsonDocumen
   if (data.containsKey("ntp_server"))
     conf.ntpServer = data["ntp_server"].as<String>();
 
+  if (data.containsKey("timezone"))
+    conf.timezone = data["timezone"].as<String>();
+  else
+    conf.timezone = "UTC";
+
   if (data.containsKey("board"))
     conf.board = data["board"].as<String>();
 }
@@ -215,6 +220,8 @@ void ProjectConfigurationManagement::writeProjectConfiguration(Configuration &co
   data["packet_logger"]["tail_length"]   = conf.packetLogger.tail_length;
 
   data["ntp_server"] = conf.ntpServer;
+
+  data["timezone"] = conf.timezone;
 
   data["board"] = conf.board;
 }

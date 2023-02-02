@@ -24,9 +24,6 @@
 #define VERSION     "23.01.0"
 #define MODULE_NAME "Main"
 
-String create_lat_aprs(double lat);
-String create_long_aprs(double lng);
-
 QueueHandle_t toAprsIs;
 QueueHandle_t fromModem;
 QueueHandle_t toModem;
@@ -214,6 +211,8 @@ void setup() {
   esp_task_wdt_reset();
 
   if (tcpip) {
+    setenv("TZ", LoRaSystem.getUserConfig()->timezone.c_str(), 1);
+    tzset();
     sntp_set_sync_mode(SNTP_SYNC_MODE_IMMED);
     sntp_set_sync_interval(3600 * 1000); // One hour
     sntp_setservername(0, LoRaSystem.getUserConfig()->ntpServer.c_str());

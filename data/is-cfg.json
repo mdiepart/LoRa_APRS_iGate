@@ -97,5 +97,6 @@
 		"files_history": 9,
 		"tail_length": 10
 	},
-	"ntp_server": "pool.ntp.org"
+	"ntp_server": "pool.ntp.org",
+	"timezone": "CEST-1CET,M3.2.0/2:00:00,M11.1.0/2:00:00"
 }

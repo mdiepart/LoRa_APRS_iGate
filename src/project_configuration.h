@@ -192,6 +192,7 @@ public:
   OTA          ota;
   PacketLogger packetLogger;
   String       ntpServer;
+  String       timezone;
   String       board;
 };
 

@@ -275,17 +275,15 @@ void WebTask::uploadfw_page(WiFiClient &client, webserver::Header_t &header, Sys
   uint8_t      full_buffer[BUFFER_LENGTH + 3] = {0}; // add two bytes to allow prepending data when LF was read, add 1 for terminator
   uint8_t     *read_buffer                    = full_buffer + 2;
   full_buffer[1]                              = '\n'; // This char will always be '\n'
-  int       len;
   String    name;
   String    filename;
   esp_err_t esp_error = ESP_OK;
 
   // Read a line. It should be the first boundary of the form-data
-  len                  = client.readBytesUntil('\n', read_buffer, BUFFER_LENGTH);
-  read_buffer[len - 1] = '\0'; // Replace '\r' by '\0'
+  size_t boundary_len           = client.readBytesUntil('\n', read_buffer, BUFFER_LENGTH);
+  read_buffer[boundary_len - 1] = '\0'; // Replace '\r' by '\0'
   APP_LOGD("uploadFW", "boundary token = %s, buffer = %s.", boundary_token.c_str(), read_buffer);
   if (strcmp(boundary_token.c_str(), (const char *)read_buffer) == 0) { // We found a boundary token. It should be at the beginning of a form part
-    size_t file_size = 0;
     while (client.available() && esp_error == ESP_OK) {
       String headerStr = readCRLFCRLF(client); // Read the header that is just after the boundary
       // Determine field name
@@ -300,6 +298,8 @@ void WebTask::uploadfw_page(WiFiClient &client, webserver::Header_t &header, Sys
           continue;
         }
 
+        size_t                 file_size = 0;
+        int                    len;
         const esp_partition_t *next_part = esp_ota_get_next_update_partition(NULL);
         esp_ota_handle_t       ota_handle;
         bool                   data_prepended = false;
@@ -402,6 +402,8 @@ void WebTask::uploadfw_page(WiFiClient &client, webserver::Header_t &header, Sys
           continue;
         }
 
+        size_t                   file_size = 0;
+        int                      len;
         esp_partition_iterator_t spiffs_part_it = esp_partition_find(ESP_PARTITION_TYPE_DATA, ESP_PARTITION_SUBTYPE_DATA_SPIFFS, NULL);
         const esp_partition_t   *spiffs_part    = esp_partition_get(spiffs_part_it);
         esp_partition_iterator_release(spiffs_part_it);
@@ -462,7 +464,7 @@ void WebTask::uploadfw_page(WiFiClient &client, webserver::Header_t &header, Sys
         }
 
         if (esp_error != ESP_OK) {
-          APP_LOGW(getName(), "Error while writing to spiffs partition.");
+          APP_LOGW(getName(), "Error %d while writing to spiffs partition.", esp_error);
           break;
         }
       }
