@@ -159,6 +159,7 @@ void RadiolibTask::worker() {
         // Log an error
         APP_LOGI(getName(), "[%s] Received corrupt packet (CRC check failed)", timeStr);
         logEntry entry(NULL, now, radio->getRSSI(), radio->getSNR(), radio->getFrequencyError());
+        xQueueSend(_toPacketLogger, &entry, pdMS_TO_TICKS(100));
       } else if (state != RADIOLIB_ERR_NONE) {
         APP_LOGE(getName(), "[%s] readData failed, code %d", timeStr, state);
       } else {
