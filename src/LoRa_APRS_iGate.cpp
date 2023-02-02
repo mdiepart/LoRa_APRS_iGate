@@ -21,7 +21,7 @@
 #include "TaskWifi.h"
 #include "project_configuration.h"
 
-#define VERSION     "23.01.0"
+#define VERSION     "23.05.0"
 #define MODULE_NAME "Main"
 
 QueueHandle_t toAprsIs;

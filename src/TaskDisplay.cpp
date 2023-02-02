@@ -104,10 +104,12 @@ void DisplayTask::setStatusFrame(std::shared_ptr<StatusFrame> frame) {
 
 void DisplayTask::showSpashScreen(String firmwareTitle, String version) {
   Bitmap bitmap(_disp);
-  bitmap.drawString(0, 10, firmwareTitle);
-  bitmap.drawString(0, 20, version);
-  bitmap.drawString(0, 35, "by Peter Buchegger");
-  bitmap.drawString(30, 45, "OE5BPA");
+  bitmap.drawString(0, 0, firmwareTitle);
+  bitmap.drawString(0, 10, version);
+  bitmap.drawString(0, 25, "by ON4MOD");
+  bitmap.drawString(20, 35, "Morgan Diepart");
+  bitmap.drawString(0, 45, "Original work: OE5BPA");
+  bitmap.drawString(20, 55, "Peter Buchegger");
   _disp->display(&bitmap);
 }
 
