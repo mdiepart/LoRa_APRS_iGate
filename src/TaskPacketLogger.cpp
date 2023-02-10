@@ -146,8 +146,8 @@ void PacketLoggerTask::worker() {
       if (lineLength > 0) {
         line = new char[lineLength + 1];
         if (line != NULL) {
-          lineLength = snprintf(nullptr, 0, fmt, _counter, timestamp, " ", //
-                                " ", " ", "INVALID PACKET", entry.rssi, entry.snr, entry.freq_error);
+          snprintf(line, lineLength + 1, fmt, _counter, timestamp, " ", //
+                   " ", " ", "INVALID PACKET", entry.rssi, entry.snr, entry.freq_error);
         }
       }
     } else {
