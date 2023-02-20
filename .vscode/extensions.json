@@ -4,5 +4,5 @@
     "recommendations": [
         "platformio.platformio-ide",
         "xaver.clang-format"
-    ],
+    ]
 }
