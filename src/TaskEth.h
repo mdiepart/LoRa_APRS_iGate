@@ -3,17 +3,17 @@
 
 #include <TaskManager.h>
 
-void WiFiEvent(WiFiEvent_t event);
+void NetworkEvent(WiFiEvent_t event);
 
-class EthTask : public Task {
+class EthTask : public FreeRTOSTask {
 public:
-  EthTask();
+  EthTask(UBaseType_t priority, BaseType_t coreId, const bool displayOnScreen, System &system);
   virtual ~EthTask();
 
-  virtual bool setup(System &system) override;
-  virtual bool loop(System &system) override;
+  void worker() override;
 
 private:
+  System &_system;
 };
 
 #endif

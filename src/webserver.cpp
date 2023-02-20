@@ -5,24 +5,17 @@
 
 #include "webserver.h"
 
-webserver::webserver() {
-  get_targets     = std::map<String, targetProcessing>();
-  post_targets    = std::map<String, targetProcessing>();
-  known_resources = std::set<String>();
+webserver::webserver() : get_targets(), post_targets(), known_resources() {
 }
 
 bool webserver::addTarget(Method m, const String target, targetProcessing fn) {
   if (m == GET) {
-    if (get_targets.find(target) != get_targets.end()) {
-      get_targets.erase(target);
-    }
+    get_targets.erase(target); // If it already exists, remove it
     get_targets.emplace(target, fn);
     known_resources.emplace(target);
     return true;
   } else if (m == POST) {
-    if (post_targets.find(target) != post_targets.end()) {
-      post_targets.erase(target);
-    }
+    post_targets.erase(target); // If it already exists, remove it
     post_targets.emplace(target, fn);
     known_resources.emplace(target);
     return true;
@@ -35,7 +28,7 @@ void webserver::serve(WiFiClient &client, System &system) {
   String start_line = client.readStringUntil('\n');
   start_line += '\n';
 
-  logger.info(String("webServer"), "start line : %s", start_line.c_str());
+  APP_LOGI(String("webServer"), "start line : %s", start_line.c_str());
 
   webTarget target(start_line);
 
@@ -73,7 +66,7 @@ void webserver::serve(WiFiClient &client, System &system) {
       return;
     }
   } else {
-    logger.info(String("webServer"), "Found weird target, we should not be here...");
+    APP_LOGI(String("webServer"), "Found weird target, we should not be here...");
 
     // Error 500
     client.println(STATUS_500);

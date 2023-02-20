@@ -4,15 +4,14 @@
 #include <TaskManager.h>
 #include <WiFiMulti.h>
 
-class WifiTask : public Task {
+class WifiTask : public FreeRTOSTask {
 public:
-  WifiTask();
-  virtual ~WifiTask();
+  WifiTask(UBaseType_t priority, BaseType_t coreId, const bool displayOnScreen, System &system);
 
-  virtual bool setup(System &system) override;
-  virtual bool loop(System &system) override;
+  void worker() override;
 
 private:
+  System   &_system;
   WiFiMulti _wiFiMulti;
   uint8_t   _oldWifiStatus;
 };

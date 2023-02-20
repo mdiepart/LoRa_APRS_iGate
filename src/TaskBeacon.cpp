@@ -1,103 +1,162 @@
 #include <OneButton.h>
-#include <TimeLib.h>
+#include <ctime>
+#include <esp_sntp.h>
+#include <functional>
 #include <logger.h>
 
+#include "System.h"
 #include "Task.h"
 #include "TaskBeacon.h"
+#include "TaskDisplay.h"
 #include "project_configuration.h"
 
-BeaconTask::BeaconTask(TaskQueue<std::shared_ptr<APRSMessage>> &toModem, TaskQueue<std::shared_ptr<APRSMessage>> &toAprsIs) : Task(TASK_BEACON, TaskBeacon), _toModem(toModem), _toAprsIs(toAprsIs), _ss(1), _useGps(false) {
-}
+OneButton         BeaconTask::_userButton;
+bool              BeaconTask::_send_update;
+bool              BeaconTask::_fast_pace;
+uint              BeaconTask::_instances;
+TaskHandle_t      beaconTaskhandle = NULL;
+SemaphoreHandle_t buttonSemaphore;
 
-BeaconTask::~BeaconTask() {
+BeaconTask::BeaconTask(UBaseType_t priority, BaseType_t coreId, const bool displayOnScreen, System &system, QueueHandle_t &toModem, QueueHandle_t &toAprsIs, QueueHandle_t &toDisplay)
+    : FreeRTOSTask(TASK_BEACON, TaskBeacon, priority, 2048, coreId, displayOnScreen), _toModem(toModem), _toAprsIs(toAprsIs), _toDisplay(toDisplay), _system(system), _ss(1), _useGps(false) /*, _beaconMsgReady(false), _aprsBeaconSent(false)*/, _lastBeaconSentTime(0), _beaconPeriod(pdMS_TO_TICKS(_system.getUserConfig()->beacon.timeout * 60 * 1000)), _fast_pace_start_time(0) {
+  start();
 }
-
-OneButton BeaconTask::_userButton;
-bool      BeaconTask::_send_update;
-uint      BeaconTask::_instances;
 
 void BeaconTask::pushButton() {
   _send_update = true;
 }
 
-bool BeaconTask::setup(System &system) {
-  if (_instances++ == 0 && system.getBoardConfig()->Button > 0) {
-    _userButton = OneButton(system.getBoardConfig()->Button, true, true);
+void BeaconTask::startFastPace() {
+  BaseType_t higherPriorityAwoken = pdFALSE;
+  if (_fast_pace == false) {
+    _fast_pace = true;
+    xSemaphoreGiveFromISR(buttonSemaphore, &higherPriorityAwoken);
+    portYIELD_FROM_ISR(higherPriorityAwoken);
+  }
+}
+
+void BeaconTask::worker() {
+  time_t    now;
+  struct tm timeInfo;
+  char      timeStr[9];
+  buttonSemaphore = xSemaphoreCreateBinary();
+
+  if (buttonSemaphore == NULL) {
+    APP_LOGE(getName(), "Could not create semaphore. Beacon button disabled.");
+  } else if (_instances++ == 0 && _system.getBoardConfig()->Button > 0) {
+    attachInterrupt(_system.getBoardConfig()->Button, startFastPace, CHANGE);
+    _userButton = OneButton(_system.getBoardConfig()->Button, true, false);
     _userButton.attachClick(pushButton);
     _send_update = false;
   }
 
-  _useGps = system.getUserConfig()->beacon.use_gps;
+  _useGps = _system.getUserConfig()->beacon.use_gps;
+  _beaconMsg.setSource(_system.getUserConfig()->callsign);
+  _beaconMsg.setDestination("APLG01");
 
   if (_useGps) {
-    if (system.getBoardConfig()->GpsRx != 0) {
-      _ss.begin(9600, SERIAL_8N1, system.getBoardConfig()->GpsTx, system.getBoardConfig()->GpsRx);
+    if (_system.getBoardConfig()->GpsRx != 0) {
+      _ss.begin(9600, SERIAL_8N1, _system.getBoardConfig()->GpsTx, _system.getBoardConfig()->GpsRx);
+      auto onReceiveFn = std::bind(std::mem_fn(&BeaconTask::onGpsSSReceive), this);
+      _ss.onReceive(onReceiveFn);
     } else {
-      logger.info(getName(), "NO GPS found.");
+      APP_LOGW(getName(), "NO GPS found.");
       _useGps = false;
     }
   }
-  // setup beacon
-  _beacon_timer.setTimeout(system.getUserConfig()->beacon.timeout * 60 * 1000);
 
-  _beaconMsg = std::shared_ptr<APRSMessage>(new APRSMessage());
-  _beaconMsg->setSource(system.getUserConfig()->callsign);
-  _beaconMsg->setDestination("APLG01");
-
-  return true;
-}
-
-bool BeaconTask::loop(System &system) {
-  if (_useGps) {
-    while (_ss.available() > 0) {
-      char c = _ss.read();
-      _gps.encode(c);
+  // Wait for network and NTP time
+  if (_system.getUserConfig()->aprs_is.active) {
+    while (!_system.isWifiOrEthConnected() || (sntp_get_sync_status() == SNTP_SYNC_STATUS_RESET)) {
+      vTaskDelay(1500 / portTICK_PERIOD_MS);
     }
   }
 
-  _userButton.tick();
+  _send_update = true;
+  for (;;) {
+    // Send update if needed
+    if (_send_update) {
+      if (buildBeaconMsg() == false) {
+        _send_update = false;
+        continue;
+      }
+      _stateInfo          = "Sending...";
+      _lastBeaconSentTime = xTaskGetTickCount();
+      if (_system.getUserConfig()->aprs_is.active) {
+        // Prepare APRS message to send to APRS-is
+        APRSMessage *ipMsg = new APRSMessage(_beaconMsg);
+        xQueueSendToBack(_toAprsIs, &ipMsg, pdMS_TO_TICKS(100));
 
-  // check for beacon
-  if (_beacon_timer.check() || _send_update) {
-    if (sendBeacon(system)) {
+        // Log
+        time(&now);
+        localtime_r(&now, &timeInfo);
+        strftime(timeStr, 9, "%T", &timeInfo);
+        APP_LOGI(getName(), "[IP Beacon][%s] %s", timeStr, _beaconMsg.encode().c_str());
+        TextFrame *frame = new TextFrame("IP BEACON", _beaconMsg.toString());
+        xQueueSendToBack(_toDisplay, &frame, pdMS_TO_TICKS(100));
+
+        // Wait at least 30s before RF
+        if (_system.getUserConfig()->digi.beacon) {
+          vTaskDelay(pdMS_TO_TICKS(30000));
+        }
+      }
+      if (_system.getUserConfig()->digi.beacon) {
+        // Prepare APRS message to send to RF
+        APRSMessage *rfMsg = new APRSMessage(_beaconMsg);
+        xQueueSendToBack(_toModem, &rfMsg, pdMS_TO_TICKS(100));
+
+        // Log
+        time(&now);
+        localtime_r(&now, &timeInfo);
+        strftime(timeStr, 9, "%T", &timeInfo);
+        APP_LOGI(getName(), "[RF Beacon][%s] %s", timeStr, _beaconMsg.encode().c_str());
+        TextFrame *frame = new TextFrame("RF BEACON", _beaconMsg.toString());
+        xQueueSendToBack(_toDisplay, &frame, pdMS_TO_TICKS(100));
+      }
+      _stateInfo   = "Beacon Sent";
       _send_update = false;
-      _beacon_timer.start();
+    }
+
+    // Check button if needed
+    if (_fast_pace) {
+      _userButton.tick();
+      vTaskDelay(pdMS_TO_TICKS(10));
+      if (xTaskGetTickCount() - _fast_pace_start_time >= _fast_pace_timeout) {
+        _fast_pace = false;
+      }
+      continue;
+    } else {
+      TickType_t ticksLeft = _beaconPeriod - (xTaskGetTickCount() - _lastBeaconSentTime);
+      time(&now);
+      now += ((ticksLeft + 999) / 1000);
+      localtime_r(&now, &timeInfo);
+      strftime(timeStr, sizeof(timeStr), "%T", &timeInfo);
+      _stateInfo = String("Next @") + timeStr;
+      if (xSemaphoreTake(buttonSemaphore, ticksLeft) == pdTRUE) {
+        // Semaphore was obtained. That means that the button was pressed.
+        _fast_pace            = true;
+        _fast_pace_start_time = xTaskGetTickCount();
+      } else {
+        // Timed out, we need to send a beacon
+        _send_update = true;
+      }
     }
   }
-
-  uint32_t diff = _beacon_timer.getTriggerTimeInSec();
-  _stateInfo    = "beacon " + String(uint32_t(diff / 600)) + String(uint32_t(diff / 60) % 10) + ":" + String(uint32_t(diff / 10) % 6) + String(uint32_t(diff % 10));
-
-  return true;
 }
 
-String create_lat_aprs(double lat) {
-  char str[20];
-  char n_s = 'N';
-  if (lat < 0) {
-    n_s = 'S';
+void BeaconTask::onGpsSSReceive() {
+  uint8_t buffer[64];
+  size_t  n = min<size_t>(_ss.available(), 64);
+  n         = _ss.readBytes(buffer, n);
+
+  for (size_t i = 0; i < n; i++) {
+    _gps.encode(buffer[i]);
   }
-  lat = std::abs(lat);
-  sprintf(str, "%02d%05.2f%c", (int)lat, (lat - (double)((int)lat)) * 60.0, n_s);
-  String lat_str(str);
-  return lat_str;
 }
 
-String create_long_aprs(double lng) {
-  char str[20];
-  char e_w = 'E';
-  if (lng < 0) {
-    e_w = 'W';
-  }
-  lng = std::abs(lng);
-  sprintf(str, "%03d%05.2f%c", (int)lng, (lng - (double)((int)lng)) * 60.0, e_w);
-  String lng_str(str);
-  return lng_str;
-}
-
-bool BeaconTask::sendBeacon(System &system) {
-  double lat = system.getUserConfig()->beacon.positionLatitude;
-  double lng = system.getUserConfig()->beacon.positionLongitude;
+bool BeaconTask::buildBeaconMsg() {
+  double lat = _system.getUserConfig()->beacon.positionLatitude;
+  double lng = _system.getUserConfig()->beacon.positionLongitude;
 
   if (_useGps) {
     if (_gps.location.isUpdated()) {
@@ -107,19 +166,30 @@ bool BeaconTask::sendBeacon(System &system) {
       return false;
     }
   }
-  _beaconMsg->getBody()->setData(String("=") + create_lat_aprs(lat) + "L" + create_long_aprs(lng) + "&" + system.getUserConfig()->beacon.message);
 
-  logger.info(getName(), "[%s] %s", timeString().c_str(), _beaconMsg->encode().c_str());
+  String   aprs_data = "!L";
+  uint32_t lat_91    = 380926 * (90.0 - lat);
+  uint32_t lng_91    = 190463 * (180.0 + lng);
 
-  if (system.getUserConfig()->aprs_is.active) {
-    _toAprsIs.addElement(_beaconMsg);
-  }
+  aprs_data += String(char(33 + (lat_91 / 753571)));
+  lat_91 %= 753571;
+  aprs_data += String(char(33 + (lat_91 / 8281)));
+  lat_91 %= 8281;
+  aprs_data += String(char(33 + (lat_91 / 91)));
+  lat_91 %= 91;
+  aprs_data += String(char(33 + lat_91));
 
-  if (system.getUserConfig()->digi.beacon) {
-    _toModem.addElement(_beaconMsg);
-  }
+  aprs_data += String(char(33 + (lng_91 / 753571)));
+  lng_91 %= 753571;
+  aprs_data += String(char(33 + (lng_91 / 8281)));
+  lng_91 %= 8281;
+  aprs_data += String(char(33 + (lng_91 / 91)));
+  lng_91 %= 91;
+  aprs_data += String(char(33 + lng_91));
 
-  system.getDisplay().addFrame(std::shared_ptr<DisplayFrame>(new TextFrame("BEACON", _beaconMsg->toString())));
+  aprs_data += "& sT"; // No course, speed, range or compression type byte
+
+  _beaconMsg.getBody()->setData(aprs_data + _system.getUserConfig()->beacon.message);
 
   return true;
 }

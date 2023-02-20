@@ -1,40 +1,35 @@
 #ifndef TASK_LORA_H_
 #define TASK_LORA_H_
 
-#include "project_configuration.h"
 #include <APRS-Decoder.h>
 #include <RadioLib.h>
-#include <TaskManager.h>
 
-class RadiolibTask : public Task {
+#include "TaskManager.h"
+#include "project_configuration.h"
+
+class RadiolibTask : public FreeRTOSTask {
 public:
-  explicit RadiolibTask(TaskQueue<std::shared_ptr<APRSMessage>> &fromModem, TaskQueue<std::shared_ptr<APRSMessage>> &_toModem);
+  RadiolibTask(UBaseType_t priority, BaseType_t coreId, const bool displayOnScreen, System &system, QueueHandle_t &fromModem, QueueHandle_t &toModem, QueueHandle_t &toPacketLogger, QueueHandle_t &_toDisplay);
   virtual ~RadiolibTask();
 
-  virtual bool setup(System &system) override;
-  virtual bool loop(System &system) override;
+  void worker() override;
 
 private:
   Module *module;
   SX1278 *radio;
+  System &_system;
 
   Configuration::LoRa config;
 
   bool rxEnable, txEnable;
 
-  TaskQueue<std::shared_ptr<APRSMessage>> &_fromModem;
-  TaskQueue<std::shared_ptr<APRSMessage>> &_toModem;
-
-  static volatile bool enableInterrupt; // Need to catch interrupt or not.
-  static volatile bool operationDone;   // Caught IRQ or not.
-
-  static void setFlag(void);
+  QueueHandle_t &_fromModem;
+  QueueHandle_t &_toModem;
+  QueueHandle_t &_toPacketLogger;
+  QueueHandle_t &_toDisplay;
 
   int16_t startRX(uint8_t mode);
   int16_t startTX(String &str);
-
-  uint32_t preambleDurationMilliSec;
-  Timer    txWaitTimer;
 };
 
 #endif

@@ -4,17 +4,15 @@
 #include <ESP-FTP-Server-Lib.h>
 #include <TaskManager.h>
 
-class FTPTask : public Task {
+class FTPTask : public FreeRTOSTask {
 public:
-  FTPTask();
-  virtual ~FTPTask();
+  FTPTask(UBaseType_t priority, BaseType_t coreId, const bool displayOnScreen, System &system);
 
-  virtual bool setup(System &system) override;
-  virtual bool loop(System &system) override;
+  void worker() override;
 
 private:
+  System   &_system;
   FTPServer _ftpServer;
-  bool      _beginCalled;
 };
 
 #endif

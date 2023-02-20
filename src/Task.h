@@ -2,7 +2,8 @@
 #define TASK_H_
 
 enum TaskNames {
-  TaskAprsIs = 1,
+  TaskDisplay = 0,
+  TaskAprsIs,
   TaskEth,
   TaskFtp,
   TaskModem,
@@ -32,5 +33,6 @@ enum TaskNames {
 #define TASK_BEACON        "BeaconTask"
 #define TASK_WEB           "WebTask"
 #define TASK_PACKET_LOGGER "PacketLoggerTask"
+#define TASK_DISPLAY       "DisplayTask"
 
 #endif

@@ -23,7 +23,7 @@ public:
 
   class Network {
   public:
-    Network() : DHCP(true) {
+    Network() : DHCP(true), static_(), hostname() {
     }
 
     bool     DHCP;
@@ -33,7 +33,7 @@ public:
 
   class Wifi {
   public:
-    Wifi() : active(true) {
+    Wifi() : active(true), APs() {
     }
 
     bool active;
@@ -60,7 +60,7 @@ public:
 
   class APRS_IS {
   public:
-    APRS_IS() : active(true), server("euro.aprs2.net"), port(14580) {
+    APRS_IS() : active(true), passcode(), server("euro.aprs2.net"), port(14580) {
     }
 
     bool   active;
@@ -80,7 +80,7 @@ public:
 
   class LoRa {
   public:
-    LoRa() : frequencyRx(433775000), frequencyTx(433775000), power(20), spreadingFactor(12), signalBandwidth(125000), codingRate4(5), tx_enable(true) {
+    LoRa() : frequencyRx(433775000), gainRx(0), frequencyTx(433775000), power(20), spreadingFactor(12), signalBandwidth(125000), codingRate4(5), tx_enable(true) {
     }
 
     long    frequencyRx;
@@ -112,7 +112,7 @@ public:
       String password;
     };
 
-    Ftp() : active(false) {
+    Ftp() : active(false), users() {
     }
 
     bool            active;
