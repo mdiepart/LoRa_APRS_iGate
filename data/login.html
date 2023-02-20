@@ -9,23 +9,26 @@
 </head>
 
 <body>
-    <div class="container wrapper login_div">
-        <p><br></p>
-        <div class="title"><span>iGate Web Server</span></div>
-        $$STATUS$$
-        <form action="/login" method="post">
-            <!-- Put label for="Password in white-->
-            <label for="Password" style="color: white;">Password:</label>
-            <div class="row">
-                <i class="fas fa-lock"></i>
-                <input type="password" id="Password" placeholder="Password" name="Password" required>
-            </div>
+    <div class="content">
+        <div class="container wrapper login_div">
+            <p><br></p>
+            <div class="title"><span>iGate Web Server</span></div>
+            $$STATUS$$
+            <form action="/login" method="post">
+                <!-- Put label for="Password in white-->
+                <label for="Password" style="color: white;">Password:</label>
+                <div class="row">
+                    <i class="fas fa-lock"></i>
+                    <input type="password" id="Password" placeholder="Password" name="Password" required>
+                </div>
 
-            <div class="row button">
-                <input type="submit" value="Login">
-            </div>
-        </form>
+                <div class="row button">
+                    <input type="submit" value="Login">
+                </div>
+            </form>
+        </div>
     </div>
+
 
 </body>
 

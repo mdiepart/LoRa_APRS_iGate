@@ -1,5 +1,5 @@
 {
-	"callsign": "NOCALL-10",
+	"callsign": "ON4BCY-10",
 	"network": {
 		"DHCP": true,
 		"static": {
@@ -11,31 +11,31 @@
 		},
 		"hostname": {
 			"overwrite": false,
-			"name": "NOCALL-10"
+			"name": "ON4BCY-10"
 		}
 	},
 	"wifi": {
 		"active": true,
 		"AP": [
 			{
-				"SSID": "YOURSSID",
-				"password": "YOURPASSWORD"
+				"SSID": "VDSL3",
+				"password": "4134413441344134"
 			}
 		]
 	},
 	"beacon": {
-		"message": "LoRa iGATE & Digi, Info: github.com/lora-aprs/LoRa_APRS_iGate",
+		"message": "Working on webserver",
 		"position": {
-			"latitude": 0.000000,
-			"longitude": 0.000000
+			"latitude": 50.59283,
+			"longitude": 5.89673
 		},
 		"use_gps": false,
 		"timeout": 15
 	},
 	"aprs_is": {
 		"active": true,
-		"passcode": "",
-		"server": "euro.aprs2.net",
+		"passcode": "19383",
+		"server": "192.168.1.176",
 		"port": 14580
 	},
 	"digi": {

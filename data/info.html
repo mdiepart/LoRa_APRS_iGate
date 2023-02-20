@@ -1,23 +1,33 @@
 <!DOCTYPE html>
-<html>
+<html lang="en" dir="ltr">
 
 <head>
+    <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <link href="/style.css" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.2/css/all.min.css" />
-    <!--Add a title-->
-    <title>LoRa iGate Web Server</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.1.2/css/all.min.css">
 </head>
 
 <body>
-    <div class="sidebar">
-        <a href="#HOME"><i class="fa fa-fw fa-home"></i> Home</a>
-        <a href="#STATUS"><i class="fas fa-comment-alt"></i> Status</a>
-        <a href="#LOGS"><i class="fa fa-fw fa-book"></i> Logs</a>
-        <a href="#OTA"><i class="fa fa-fw fa-wifi"></i> Enable OTA</a>
-        <a href="#FIRMWARE"><i class="fa fa-fw fa-wrench"></i> Update Firmware</a>
+    <div class="wrapper">
+        <input type="checkbox" id="btn" hidden>
+        <label for="btn" class="menu-btn">
+            <i class="fas fa-bars"></i>
+            <i class="fas fa-times"></i>
+        </label>
+        <nav id="sidebar">
+            <div class="title">Side Menu</div>
+            <ul class="list-items">
+                <li><a href="#HOME"><i class="fas fa-home"></i>Home</a></li>
+                <li><a href="#STATUS"><i class="fas fa-comment-alt"></i>Status</a></li>
+                <li><a href="#LOGS"><i class="fa fa-fw fa-book"></i>Logs</a></li>
+                <li><a href="#OTA"><i class="fa fa-fw fa-wifi"></i>Enable OTA</a></li>
+                <li><a href="#FIRMWARE"><i class="fas fa-home"></i>Update Firmware</a></li>
+                <li><a href="./reset"><i class="fas fa-undo"></i>Reset</a></li>
+            </ul>
+        </nav>
     </div>
-    <div class="main">
+    <div class="content">
         <div class="container wrapper HOME" id="HOME">
             <p><br></p>
             <div class="title"><span>LoRa iGate Web Server:</span></div>
@@ -33,26 +43,27 @@
             $$TASKLIST$$
             <p><br></p>
         </div>
+
         <div class="container wrapper LOGS" id="LOGS">
             <p><br></p>
             <div class="title"><span>Logs</span></div>
             <p><br></p>
             <div style="overflow-x:auto;">
-                <table class="fixed_header" style="width:100%; height: 400px;">
-                    <thead>
-                        <tr>
-                            <th>Number</th>
-                            <th>Timestamp</th>
-                            <th>Callsign</th>
-                            <th>Target</th>
-                            <th>Path</th>
-                            <th>Data</th>
-                            <th>RSSI (dBm)</th>
-                            <th>SNR (dB)</th>
-                            <th>Freq Error (Hz)</th>
+                <table class="fixed_header Logs_tb" style="width:100%; height: 400px;">
+                    <thead class="tb_head">
+                        <tr class="tb_row">
+                            <th class="tb_title">Number</th>
+                            <th class="tb_title">Timestamp</th>
+                            <th class="tb_title">Callsign</th>
+                            <th class="tb_title">Target</th>
+                            <th class="tb_title">Path</th>
+                            <th class="tb_title">Data</th>
+                            <th class="tb_title">RSSI (dBm)</th>
+                            <th class="tb_title">SNR (dB)</th>
+                            <th class="tb_title">Freq Error (Hz)</th>
                         </tr>
                     </thead>
-                    <tbody>
+                    <tbody class="tb_bhead">
                         <tr>
                             $$LOGSLIST$$
                         </tr>
@@ -67,6 +78,7 @@
                 </div>
             </form>
         </div>
+
         <div class="container wrapper OTA" id="OTA">
             <p><br></p>
             <div class="title"><span>Over the air:</span></div>
@@ -109,7 +121,6 @@
 
         </div>
     </div>
-
 </body>
 
 </html>
