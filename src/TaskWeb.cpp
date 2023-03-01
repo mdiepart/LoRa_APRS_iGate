@@ -1,6 +1,7 @@
 #include <SPIFFS.h>
 #include <WiFi.h>
 #include <esp_err.h>
+#include <esp_https_server.h>
 #include <esp_ota_ops.h>
 #include <esp_task_wdt.h>
 #include <functional>
@@ -11,57 +12,69 @@
 #include "TaskWeb.h"
 #include "project_configuration.h"
 
-WebTask::WebTask(UBaseType_t priority, BaseType_t coreId, const bool displayOnScreen, System &system) : FreeRTOSTask(TASK_WEB, TaskWeb, priority, 8192, coreId, displayOnScreen), http_server(80), _system(system) {
+WebTask::WebTask(UBaseType_t priority, BaseType_t coreId, const bool displayOnScreen, System &system) : FreeRTOSTask(TASK_WEB, TaskWeb, priority, 8192, coreId, displayOnScreen), httpd_handle(NULL), _system(system) {
   start();
 }
 
 WebTask::~WebTask() {
-  http_server.close();
 }
 
 void WebTask::worker() {
-  Webserver = webserver();
-  {
-    using namespace std::placeholders;
-    auto fn_root_redirect = std::bind(std::mem_fn(&WebTask::root_redirect), this, _1, _2, _3);
-    Webserver.addTarget(webserver::GET, "/", fn_root_redirect); // root. Return 301 -> /info ; no auth
 
-    auto fn_style_css = std::bind(std::mem_fn(&WebTask::style_css), this, _1, _2, _3);
-    Webserver.addTarget(webserver::GET, "/style.css", fn_style_css); // style.css; no auth
+  SPIFFS.begin();
 
-    auto fn_login = std::bind(std::mem_fn(&WebTask::login_page), this, _1, _2, _3);
-    Webserver.addTarget(webserver::GET, "/login", fn_login);  // /login ; no auth
-    Webserver.addTarget(webserver::POST, "/login", fn_login); // /login ; no auth
-
-    auto fn_enable_ota = std::bind(std::mem_fn(&WebTask::enableota_page), this, _1, _2, _3);
-    Webserver.addTarget(webserver::POST, "/enableOTA", fn_enable_ota); // /enableOTA ; auth
-
-    auto fn_info = std::bind(std::mem_fn(&WebTask::info_page), this, _1, _2, _3);
-    Webserver.addTarget(webserver::GET, "/info", fn_info); // /info ; auth
-
-    auto fn_uploadFW = std::bind(std::mem_fn(&WebTask::uploadfw_page), this, _1, _2, _3);
-    Webserver.addTarget(webserver::POST, "/uploadFW", fn_uploadFW); // /uploadFW; auth
-
-    auto fn_packet_logs = std::bind(std::mem_fn(&WebTask::download_packets_logs), this, _1, _2, _3);
-    Webserver.addTarget(webserver::GET, "/packets.log", fn_packet_logs); // /packets.log; auth
-  }
-
-  isServerStarted = false;
-  _stateInfo      = "Awaiting network";
-
+  // Wait for network
   while (!_system.isWifiOrEthConnected()) {
     vTaskDelay(pdMS_TO_TICKS(1000));
   }
+
+  httpd_ssl_config_t https_config = HTTPD_SSL_CONFIG_DEFAULT();
+  isServerStarted                 = false;
+  _stateInfo                      = "Awaiting network";
+  https_config.httpd.core_id      = 1;
+  extern const unsigned char https_cert_start[] asm("_binary_ssl_servercert_pem_start");
+  extern const unsigned char https_cert_end[] asm("_binary_ssl_servercert_pem_end");
+  extern const unsigned char https_key_start[] asm("_binary_ssl_prvtkey_pem_start");
+  extern const unsigned char https_key_end[] asm("_binary_ssl_prvtkey_pem_end");
+  https_config.cacert_pem            = https_cert_start;
+  https_config.cacert_len            = https_cert_end - https_cert_start;
+  https_config.prvtkey_pem           = https_key_start;
+  https_config.prvtkey_len           = https_key_end - https_key_start;
+  https_config.httpd.global_user_ctx = this;
+  // https_config.httpd.global_user_ctx_free_fn = free_context;
+  https_config.httpd.stack_size = 25 * 1024;
+
+  httpd_uri_t info_uri        = {.uri = "/info", .method = HTTP_GET, .handler = info_wrapper};
+  httpd_uri_t enableota_uri   = {.uri = "/enableOTA", .method = HTTP_POST, .handler = enableota_wrapper};
+  httpd_uri_t uploadfw_uri    = {.uri = "/uploadFW", .method = HTTP_POST, .handler = uploadfw_wrapper};
+  httpd_uri_t login_uri_get   = {.uri = "/login", .method = HTTP_GET, .handler = login_wrapper};
+  httpd_uri_t login_uri_post  = {.uri = "/login", .method = HTTP_POST, .handler = login_wrapper};
+  httpd_uri_t style_css_uri   = {.uri = "/style.css", .method = HTTP_GET, .handler = style_css_wrapper};
+  httpd_uri_t root_uri        = {.uri = "/", .method = HTTP_GET, .handler = root_wrapper};
+  httpd_uri_t packets_log_uri = {.uri = "/packets.log", .method = HTTP_GET, .handler = download_packets_logs_wrapper};
+
+  esp_err_t ret   = httpd_ssl_start(&httpd_handle, &https_config);
+  isServerStarted = true;
+
+  APP_LOGD(getName(), "httpd_ssl_start returned %d", ret);
+  httpd_register_uri_handler(httpd_handle, &info_uri);
+  httpd_register_uri_handler(httpd_handle, &enableota_uri);
+  httpd_register_uri_handler(httpd_handle, &uploadfw_uri);
+  httpd_register_uri_handler(httpd_handle, &login_uri_get);
+  httpd_register_uri_handler(httpd_handle, &login_uri_post);
+  httpd_register_uri_handler(httpd_handle, &style_css_uri);
+  httpd_register_uri_handler(httpd_handle, &root_uri);
+  httpd_register_uri_handler(httpd_handle, &packets_log_uri);
+
+  // Task loop
   for (;;) {
     if (isServerStarted && !_system.isWifiOrEthConnected()) {
-      http_server.close();
       isServerStarted = false;
       APP_LOGW(getName(), "Closed HTTP server because network connection was lost.");
       _stateInfo = "Awaiting network";
     }
 
     if (!isServerStarted && _system.isWifiOrEthConnected()) {
-      http_server.begin();
       isServerStarted = true;
       APP_LOGW(getName(), "Network connection recovered, http server restarted.");
       _stateInfo = "Online";
@@ -77,29 +90,11 @@ void WebTask::worker() {
       }
     }
 
-    if (!isServerStarted) {
-      vTaskDelay(pdMS_TO_TICKS(1000));
-      continue;
-    }
-
-    // Check if we have a client available and serve it
-    WiFiClient client = http_server.available();
-
-    if (client) {
-      client.setTimeout(TIMEOUT);
-      APP_LOGI(getName(), "new client with IP %s.", client.localIP().toString().c_str());
-
-      Webserver.serve(client, _system);
-
-      // Close the connection
-      client.stop();
-    }
-
-    vTaskDelay(pdMS_TO_TICKS(100));
+    vTaskDelay(pdMS_TO_TICKS(1000));
   }
 }
 
-String WebTask::loadPage(String file) {
+String WebTask::loadPage(String file) const {
   SPIFFS.begin();
   String pageString;
   File   pageFile = SPIFFS.open(file);
@@ -124,44 +119,68 @@ String WebTask::loadPage(String file) {
   return pageString;
 }
 
-// TODO ensure that we do not crash because of a header too large (could cause DOS)
-String WebTask::readCRLFCRLF(WiFiClient &client) {
-  String        ret        = "";
-  unsigned long start_time = millis();
-  while (client.available() && (millis() - start_time < TIMEOUT * 1000)) {
-    char c = (char)client.read(); // Should succeed because client.available returned true
-    ret += c;
+/**
+ * @brief   Read bytes from a request until a double CRLF is found.
+ *
+ *
+ * @param[in] req The request the data should be read from
+ *
+ * @param[in] length Maximum number of bytes to read
+ *
+ * @return
+ *  - String : String containing the data read (including CRLFCRLF)
+ */
+String WebTask::readCRLFCRLF(httpd_req_t *req, size_t length) const {
+  String str = "";
+  char   c;
+  size_t i = 0;
+  int    ret;
+
+  while (i < length) {
+    ret = httpd_req_recv(req, &c, 1);
+    if (ret == 0) { // No more data to read
+      return str;
+    } else if (ret != 1) { // Error
+      APP_LOGE(getName(), "readCRLFCRLF: httpd_req_recv returned -1");
+      return "";
+    }
+    str += c;
     if (c == '\r') {
-      // We might be at the end of the header. Check for that.
+      // We might be at the start of a CRLFCRLF. Check for that
       char lfcrlf[4] = {0};
 
-      client.readBytes(lfcrlf, 3);
-      ret += lfcrlf;
-      if (strcmp(lfcrlf, "\n\r\n") == 0) {
-        return ret;
+      ret = httpd_req_recv(req, lfcrlf, 3);
+      if (ret >= 0 && ret < 3) {
+        str += lfcrlf;
+        return str;
+      } else if (ret == 3 && (strcmp(lfcrlf, "\n\r\n") == 0)) {
+        str += lfcrlf;
+        return str;
+      } else if (ret == 3) {
+        str += lfcrlf;
+      } else { // Error
+        APP_LOGE(getName(), "readCRLFCRLF: httpd_req_recv returned %d", ret);
+        return "";
       }
     }
+    i++;
   }
 
-  return ret;
+  return str;
 }
 
-void WebTask::info_page(WiFiClient &client, webserver::Header_t &header, System &system) {
-  if (!isClientLoggedIn(client, header)) {
-    client.println(STATUS_303_LOGIN);
-    return;
+esp_err_t WebTask::info_page(httpd_req_t *req) {
+  APP_LOGD(getName(), "info_handler");
+  if (!isClientLoggedIn(req)) {
+    return redirectToLogin(req);
   }
 
-  client.println(STATUS_200(client, header));
   String page = loadPage("/info.html");
-  page.replace("$$CALLSIGN$$", system.getUserConfig()->callsign);
-  page.replace("$$IP$$", client.localIP().toString() + ":" + String(client.localPort()));
-  page.replace("$$AP$$", WiFi.SSID());
-  page.replace("$$RSSI$$", String(WiFi.RSSI()) + "dBm");
+  page.replace("$$CALLSIGN$$", _system.getUserConfig()->callsign);
 
   // Build $$TASKLIST$$ string
   String tasklist = "";
-  for (FreeRTOSTask *task : system.getTaskManager().getFreeRTOSTasks()) {
+  for (FreeRTOSTask *task : _system.getTaskManager().getFreeRTOSTasks()) {
     switch (task->getTaskId()) {
     case TaskOta:
       switch (static_cast<OTATask *>(task)->getOTAStatus()) {
@@ -205,34 +224,38 @@ void WebTask::info_page(WiFiClient &client, webserver::Header_t &header, System 
 
   page.replace("$$TASKLIST$$", tasklist);
 
-  String logs = system.getPacketLogger()->getTail();
+  String logs = _system.getPacketLogger()->getTail();
   sanitize(logs);
   logs = "<tt>" + logs + "</tt>";
   page.replace("$$LOGSLIST$$", logs);
-
   page.trim();
-  client.println(page);
-  client.println();
+
+  httpd_resp_set_status(req, "200 OK");
+  String cookie_str = reqBumpCookie(req);
+  if (!cookie_str.isEmpty()) {
+    httpd_resp_set_hdr(req, "Set-Cookie", cookie_str.c_str());
+  }
+
+  return httpd_resp_send(req, page.c_str(), page.length());
 }
 
-void WebTask::download_packets_logs(WiFiClient &client, webserver::Header_t &header, System &system) {
-  if (!isClientLoggedIn(client, header)) {
-    client.println(STATUS_303_LOGIN);
-    return;
+esp_err_t WebTask::download_packets_logs(httpd_req_t *req) {
+  if (!isClientLoggedIn(req)) {
+    return redirectToLogin(req);
   }
-  system.getPacketLogger()->getFullLogs(client);
+  _system.getPacketLogger()->getFullLogs(req);
+
+  return ESP_OK;
 }
 
-void WebTask::enableota_page(WiFiClient &client, webserver::Header_t &header, System &system) {
-  if (!isClientLoggedIn(client, header)) {
-    client.println(STATUS_303_LOGIN);
-    return;
+esp_err_t WebTask::enableota_page(httpd_req_t *req) {
+  if (!isClientLoggedIn(req)) {
+    return redirectToLogin(req);
   }
-  client.println(STATUS_200(client, header));
 
   // Load page and replace placeholder
   String page = loadPage("/enableOTA.html");
-  for (FreeRTOSTask *it : system.getTaskManager().getFreeRTOSTasks()) {
+  for (FreeRTOSTask *it : _system.getTaskManager().getFreeRTOSTasks()) {
     if (it->getTaskId() == TaskOta) {
       static_cast<OTATask *>(it)->enableOTA(5 * 60 * 1000); // Enabling OTA for 5 minutes
       APP_LOGI(getName(), "User enabled OTA for 5 minutes via web interface");
@@ -243,32 +266,38 @@ void WebTask::enableota_page(WiFiClient &client, webserver::Header_t &header, Sy
   }
 
   page.replace("$$STATUS$$", "<p style=\"text-align: center; color: red;\">There was an error with the OTA task.</p>");
+  String cookieStr = reqBumpCookie(req);
+  if (!cookieStr.isEmpty()) {
+    httpd_resp_set_hdr(req, "Set-Cookie", cookieStr.c_str());
+  }
 
-  client.println(page);
+  return httpd_resp_send(req, page.c_str(), page.length());
 }
 
-void WebTask::uploadfw_page(WiFiClient &client, webserver::Header_t &header, System &system) {
-  if (!isClientLoggedIn(client, header)) {
-    client.println(STATUS_303_LOGIN);
-    return;
+esp_err_t WebTask::uploadfw_page(httpd_req_t *req) {
+  if (!isClientLoggedIn(req)) {
+    return redirectToLogin(req);
   }
-  const String str_content_type   = "Content-Type: multipart/form-data;";
-  const String str_content_length = "Content-Length: ";
-  const String str_boundary       = "boundary=";
+  // const String str_content_type = "Content-Type: multipart/form-data;";
+  // const String str_content_length = "Content-Length: ";
+  const String str_boundary = "boundary=";
   String       boundary_token;
 
-  webserver::Header_t::const_iterator it_content_type = header.find("Content-Type");
-  if (it_content_type == header.cend()) {
-    // This header does not describe data the way we expect it
-    APP_LOGD(getName(), "No content type in header.");
-    client.println(STATUS_400);
-    return;
-  } else {
-    // Fetch boundary token
-    String content_type = it_content_type->second;
-    boundary_token      = "--" + content_type.substring(content_type.indexOf(str_boundary) + str_boundary.length());
-    APP_LOGD(getName(), "The boundary to compare with is %s.", boundary_token.c_str());
+  // Read content type to retrieve boundary token
+  size_t content_type_len = httpd_req_get_hdr_value_len(req, "Content-Type");
+  if (content_type_len <= 0) {
+    return httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Bad Request");
   }
+  char *content_type_str = new char[++content_type_len];
+  if (content_type_str == NULL) {
+    return httpd_resp_send_500(req);
+  }
+  httpd_req_get_hdr_value_str(req, "Content-Type", content_type_str, content_type_len);
+  APP_LOGD(getName(), "Content-Type length is %d, string is \"%s\".", content_type_len, content_type_str);
+  // Fetch boundary token
+  String content_type = String(content_type_str, content_type_len);
+  boundary_token      = "--" + content_type.substring(content_type.indexOf(str_boundary) + str_boundary.length());
+  APP_LOGD(getName(), "The boundary to compare with is %s.", boundary_token.c_str());
 
   // Finished parsing header. Now parsing form data
   const size_t BUFFER_LENGTH                  = 511;
@@ -280,13 +309,20 @@ void WebTask::uploadfw_page(WiFiClient &client, webserver::Header_t &header, Sys
   esp_err_t esp_error = ESP_OK;
 
   // Read a line. It should be the first boundary of the form-data
-  size_t boundary_len           = client.readBytesUntil('\n', read_buffer, BUFFER_LENGTH);
+  size_t boundary_len           = readRequestUntil(req, '\n', read_buffer, BUFFER_LENGTH);
   read_buffer[boundary_len - 1] = '\0'; // Replace '\r' by '\0'
   APP_LOGD("uploadFW", "boundary token = %s, buffer = %s.", boundary_token.c_str(), read_buffer);
   if (strcmp(boundary_token.c_str(), (const char *)read_buffer) == 0) { // We found a boundary token. It should be at the beginning of a form part
-    while (client.available() && esp_error == ESP_OK) {
-      String headerStr = readCRLFCRLF(client); // Read the header that is just after the boundary
+    while (esp_error == ESP_OK) {
+      String headerStr = readCRLFCRLF(req, 2048); // Read the header that is just after the boundary
       // Determine field name
+      APP_LOGD(getName(), "headerStr = \"%s\".", headerStr.c_str());
+      if (headerStr.isEmpty()) { // Error while reading header
+        esp_error = ESP_FAIL;
+        break;
+      } else if (headerStr.indexOf(boundary_token + "--\r\n") >= 0) { // End of multiform
+        break;
+      }
       name     = headerStr.substring(headerStr.indexOf("name=\"") + strlen("name=\""), headerStr.indexOf("\"; filename"));
       filename = headerStr.substring(headerStr.indexOf("filename=\"") + strlen("filename=\""), headerStr.indexOf("\"\r\n"));
       APP_LOGD(getName(), "Section with name=\"%s\" and filename = \"%s\".", name.c_str(), filename.c_str());
@@ -314,17 +350,21 @@ void WebTask::uploadfw_page(WiFiClient &client, webserver::Header_t &header, Sys
         while (esp_error == ESP_OK) {
           // Updating is gonna take some time so we need to reset watchdog.
           esp_task_wdt_reset();
-          // Read from client if data is available
-          if (client.available()) {
-            len = client.readBytesUntil('\n', read_buffer, BUFFER_LENGTH);
-          } else {
-            APP_LOGD(getName(), "No more bytes available.\n\n\n");
+          // Read from client and check if read was valid
+          len = readRequestUntil(req, '\n', read_buffer, BUFFER_LENGTH);
+          if (len < 0) {
+            APP_LOGD(getName(), "readRequestUntil returned %d", len);
+            esp_error = ESP_FAIL;
             break;
-          }
-
-          if (len == 0) {
+          } else if (len == 0) {
             read_buffer[0] = '\n';
-            len            = 1 + client.readBytesUntil('\n', read_buffer + 1, BUFFER_LENGTH - 1);
+            size_t tmp     = readRequestUntil(req, '\n', read_buffer + 1, BUFFER_LENGTH - 1);
+            if (len < 0) {
+              esp_error = ESP_FAIL;
+              APP_LOGD(getName(), "readRequestUntil returned %d", tmp);
+              break;
+            }
+            len = 1 + tmp;
             // system->log_info(getName(), "read with len < 1");
           }
 
@@ -421,11 +461,22 @@ void WebTask::uploadfw_page(WiFiClient &client, webserver::Header_t &header, Sys
           // Updating is gonna take some time so we need to reset watchdog.
           esp_task_wdt_reset();
 
-          // Read from client if data is available
-          if (client.available()) {
-            len = client.readBytesUntil('\n', read_buffer, BUFFER_LENGTH);
-          } else {
+          // Read from client and check if read was valid
+          len = readRequestUntil(req, '\n', read_buffer, BUFFER_LENGTH);
+          if (len < 0) {
+            APP_LOGD(getName(), "readRequestUntil returned %d", len);
+            esp_error = ESP_FAIL;
             break;
+          } else if (len == 0) {
+            read_buffer[0] = '\n';
+            size_t tmp     = readRequestUntil(req, '\n', read_buffer + 1, BUFFER_LENGTH - 1);
+            if (len < 0) {
+              esp_error = ESP_FAIL;
+              APP_LOGD(getName(), "readRequestUntil returned %d", tmp);
+              break;
+            }
+            len = 1 + tmp;
+            // system->log_info(getName(), "read with len < 1");
           }
 
           // If we have read the boundary
@@ -468,63 +519,78 @@ void WebTask::uploadfw_page(WiFiClient &client, webserver::Header_t &header, Sys
           break;
         }
       }
-    } /* else if ((boundary_token + "--").equals(buffer)) {
-       // we found the end of form boundary
-       system->log_debug(getName(), "Finished parsing full request.");
-       break;
-     }*/
+    }
+    /*else if ((boundary_token + "--").equals(buffer)) {
+      // we found the end of form boundary
+      system->log_debug(getName(), "Finished parsing full request.");
+      break;
+    }
+    */
   } else {
     // No token where one is expected
     APP_LOGW(getName(), "Could not find firmware data.");
-
-    client.println(STATUS_400);
-    return;
+    return httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Bad Request");
   }
-
-  client.println(STATUS_200(client, header));
-  client.println("<!DOCTYPE html><html>"
-                 "<head><meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">"
-                 "<link rel=\"icon\" href=\"data:,\">"
-                 "<style>html { font-family: Helvetica; display: inline-block; margin: 0px auto; text-align: center;}</style></head>"
-                 "<body><h1>iGate Web Server</h1>"
-                 "<p>OTA Update successful. Please give the device 30s to reboot.</p>"
-                 "</body></html>\r\n");
 
   if (esp_error == ESP_OK) {
     APP_LOGW(getName(), "ESP OTA succeeded. Restarting in 2s.");
-    client.stop();
+    httpd_resp_sendstr(req, "<!DOCTYPE html><html>"
+                            "<head><meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">"
+                            "<link rel=\"icon\" href=\"data:,\">"
+                            "<style>html { font-family: Helvetica; display: inline-block; margin: 0px auto; text-align: center;}</style></head>"
+                            "<body><h1>iGate Web Server</h1>"
+                            "<p>OTA Update successful. Please give the device 30s to reboot.</p>"
+                            "</body></html>\r\n");
     esp_restart();
+  } else {
+    APP_LOGW(getName(), "ESP OTA succeeded. Restarting in 2s.");
+    httpd_resp_sendstr(req, "<!DOCTYPE html><html>"
+                            "<head><meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">"
+                            "<link rel=\"icon\" href=\"data:,\">"
+                            "<style>html { font-family: Helvetica; display: inline-block; margin: 0px auto; text-align: center;}</style></head>"
+                            "<body><h1>iGate Web Server</h1>"
+                            "<p>Error during firmware upload. Please try again.</p>"
+                            "</body></html>\r\n");
+    return ESP_OK;
   }
 }
 
-void WebTask::login_page(WiFiClient &client, webserver::Header_t &header, System &system) {
+esp_err_t WebTask::login_page(httpd_req_t *req) {
   // Check for POST/GET
+  APP_LOGD(getName(), "login_handler");
 
-  webserver::Header_t::const_iterator it_startLine = header.find("");
-  if (it_startLine == header.cend()) {
-    client.println(STATUS_500);
-    return;
-  }
-  String startLine = it_startLine->second;
-
-  if (startLine.startsWith("GET ")) {
-    if (isClientLoggedIn(client, header)) {
-      client.println(STATUS_303_INFO);
-      return;
+  if (req->method == httpd_method_t::HTTP_GET) {
+    if (isClientLoggedIn(req)) {
+      return redirectToInfo(req);
     }
 
     String page = loadPage("/login.html");
     page.replace("$$STATUS$$", "");
-    client.println(STATUS_200(client, header));
-    client.println(page);
-    client.println();
-  } else if (startLine.startsWith("POST ")) {
+    String cookieString = reqBumpCookie(req);
+    if (!cookieString.isEmpty()) {
+      httpd_resp_set_hdr(req, "Set-Cookie", cookieString.c_str());
+    }
+    return httpd_resp_send(req, page.c_str(), page.length());
+  } else if (req->method == httpd_method_t::HTTP_POST) {
+    // Read body content
+    if (req->content_len > 256) {
+      httpd_resp_set_status(req, "413 Payload Too Large");
+      return httpd_resp_send(req, STATUS_413.c_str(), STATUS_413.length());
+    }
+    char *pcBody = new char[req->content_len];
+    if (pcBody == NULL) {
+      return httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Internal Server Error");
+    }
+    httpd_req_recv(req, pcBody, req->content_len);
+    String body(pcBody, req->content_len);
+    delete pcBody;
+
     // Check password
-    String body     = readCRLFCRLF(client);
     size_t i        = body.indexOf("Password=");
     String password = body.substring(i + strlen("Password="), body.indexOf("\r\n", i));
 
-    if (system.getUserConfig()->web.password.equals(password)) {
+    if (_system.getUserConfig()->web.password.equals(password)) {
+      APP_LOGD(getName(), "Password is correct !");
       // Create a cookie
       char cookie_value[65];
       cookie_value[64] = '\0';
@@ -542,82 +608,105 @@ void WebTask::login_page(WiFiClient &client, webserver::Header_t &header, System
         }
       }
 
+      ip_t clientIP = getReqIp(req);
       // Send redirection request with cookie
       session_cookie cookie(millis(), cookie_value);
-      connected_clients.insert({client.remoteIP(), cookie});
-      client.println(STATUS_303_INFO + cookie.creationString());
+      connected_clients.erase(clientIP);
+      connected_clients.insert({clientIP, cookie});
+
+      httpd_resp_set_status(req, "303 See Other");
+      String    strCookieCreation = cookie.creationString();
+      esp_err_t ret;
+
+      ret = httpd_resp_set_hdr(req, "Set-Cookie", strCookieCreation.c_str());
+      APP_LOGD(getName(), "add header Set-Cookie returned %d", ret);
+
+      char location[] = "/info";
+      ret             = httpd_resp_set_hdr(req, "Location", location);
+      APP_LOGD(getName(), "add header location returned %d", ret);
+      ret = httpd_resp_send(req, NULL, 0);
+      APP_LOGD(getName(), "send returned %d", ret);
+      return ret;
     } else {
       // Invalid password
+      APP_LOGD(getName(), "Password is incorrect");
       String page = loadPage("/login.html");
       page.replace("$$STATUS$$", "<p class=\"warning\">Invalid password</p>");
-      client.println(STATUS_200(client, header));
-      client.println(page);
-      client.println();
+      return httpd_resp_send(req, page.c_str(), page.length());
     }
   }
+
+  return ESP_OK;
 }
 
-void WebTask::root_redirect(WiFiClient &client, webserver::Header_t &header, System &system) {
-  if (isClientLoggedIn(client, header)) {
-    client.println(STATUS_303_INFO);
+esp_err_t WebTask::root_redirect(httpd_req_t *req) {
+  APP_LOGD(getName(), "root handler");
+  if (isClientLoggedIn(req)) {
+    return redirectToInfo(req);
   } else {
-    client.println(STATUS_303_LOGIN);
+    return redirectToLogin(req);
   }
 }
 
-void WebTask::style_css(WiFiClient &client, webserver::Header_t &header, System &system) {
-  client.println("HTTP/1.1 200 OK\r\nContent-type:text/css\r\nConnection: close\r\n");
-  client.println(loadPage("/style.css"));
+esp_err_t WebTask::style_css(httpd_req_t *req) {
+  APP_LOGD(getName(), "style_css_handler");
+  httpd_resp_set_type(req, "text/css");
+  String page = loadPage("/style.css");
+  httpd_resp_send(req, page.c_str(), page.length());
+  return ESP_OK;
 }
 
-bool WebTask::isClientLoggedIn(const WiFiClient &client, const webserver::Header_t &header) const {
-  std::map<uint32_t, struct session_cookie>::const_iterator it = connected_clients.find(client.remoteIP());
-  if ((it != connected_clients.end()) && getSessionCookie(header).equals(it->second.value) && (millis() - it->second.timestamp < SESSION_LIFETIME)) {
+bool WebTask::isClientLoggedIn(httpd_req_t *req) const {
+  ip_t   clientIp           = getReqIp(req);
+  size_t session_cookie_len = 65;
+  char  *session_cookie_str = new char[65];
+  // Get required str length to store cookie
+  esp_err_t ret = httpd_req_get_cookie_val(req, "session", session_cookie_str, &session_cookie_len);
+
+  if (ret == ESP_ERR_NOT_FOUND) {
+    // Client does not contain cookie
+    APP_LOGD(getName(), "Could not find cookie \"session\"");
+    return false;
+  }
+  if (ret == ESP_ERR_HTTPD_RESULT_TRUNC) {
+    APP_LOGD(getName(), "httpd_req_get_cookie_val returned RESULT_TRUNC. session_cookie_len=%d.", session_cookie_len);
+    delete session_cookie_str;
+    session_cookie_str = new char[session_cookie_len];
+  } else {
+    APP_LOGD(getName(), "httpd_req_get_cookie_val returned %d. session_cookie_len=%d.", ret, session_cookie_len);
+  }
+  // Allocate memory and read cookie
+  if (session_cookie_str == NULL) {
+    APP_LOGD(getName(), "Could not allocate memory for cookie value");
+    return false;
+  }
+  ret = httpd_req_get_cookie_val(req, "session", session_cookie_str, &session_cookie_len);
+  if (ret != ESP_OK) {
+    APP_LOGD(getName(), "Could not get cookie (returned %d)", ret);
+    delete session_cookie_str;
+    return false;
+  }
+
+  // Get corresponding session cookie in memory
+  std::map<ip_t, session_cookie>::const_iterator it = connected_clients.find(clientIp);
+
+  // Check that the stored cookie match the given one, and that the cookie did not timeout.
+  if ((it != connected_clients.cend()) && it->second.value.equals(session_cookie_str) && (millis() - it->second.timestamp < SESSION_LIFETIME)) {
+    delete session_cookie_str;
     return true;
   }
+
+  APP_LOGD(getName(), "Cookie does not match.");
+
+  delete session_cookie_str;
   return false;
 }
 
-String WebTask::getSessionCookie(const webserver::Header_t &header) const {
-  webserver::Header_t::const_iterator it_cookie = header.find("Cookie");
-  if (it_cookie == header.cend()) {
-    return String();
-  }
-
-  String cookieLine = it_cookie->second;
-  cookieLine        = cookieLine.substring(cookieLine.indexOf("session=") + strlen("session="));
-  String session;
-  size_t j = 0;
-
-  // Read the line while we have alphanum chars.
-  while (true) {
-    if (isalnum(cookieLine.charAt(j))) {
-      session += cookieLine.charAt(j);
-    } else {
-      break;
-    }
-    j++;
-  }
-
-  return session;
-}
-
-String WebTask::session_cookie::creationString() {
-  return String("Set-Cookie: session=" + value + "; Max-Age=900; HttpOnly; SameSite=Strict\r\n");
+String WebTask::session_cookie::creationString() const {
+  return String("session=" + value + "; Max-Age=900; HttpOnly; SameSite=Strict");
 }
 
 WebTask::session_cookie::session_cookie(unsigned long t, String val) : value(val), timestamp(t) {
-}
-
-String WebTask::STATUS_200(WiFiClient &client, const webserver::Header_t &header) {
-  String response = "HTTP/1.1 200 OK\r\nContent-type:text/html\r\nConnection: close\r\n";
-  if (isClientLoggedIn(client, header)) {
-    session_cookie cookie                                       = session_cookie(millis(), connected_clients.find(client.remoteIP())->second.value);
-    connected_clients.find(client.remoteIP())->second.timestamp = millis();
-    return response + cookie.creationString();
-  } else {
-    return response;
-  }
 }
 
 void WebTask::sanitize(String &string) {
@@ -629,4 +718,84 @@ void WebTask::sanitize(String &string) {
   string.replace("'", "&apos;");
   string.replace("\n", "<br>");
   string.replace("\t", "&emsp;");
+}
+
+WebTask::ip_t WebTask::getReqIp(httpd_req_t *req) const {
+  ip_t ip     = {0};
+  int  sockfd = httpd_req_to_sockfd(req);
+
+  if (sockfd == -1) {
+    APP_LOGD("GetIP", "Could not get sockfd from http request");
+    return ip;
+  }
+
+  struct sockaddr_in6 client_name;
+  socklen_t           name_len = sizeof(client_name);
+
+  if (getpeername(sockfd, (struct sockaddr *)&client_name, &name_len) == 0) {
+    ip[0] = client_name.sin6_addr.un.u32_addr[0];
+    ip[1] = client_name.sin6_addr.un.u32_addr[1];
+    ip[2] = client_name.sin6_addr.un.u32_addr[2];
+    ip[3] = client_name.sin6_addr.un.u32_addr[3];
+  }
+
+  return ip;
+}
+
+esp_err_t WebTask::redirectToLogin(httpd_req_t *req) {
+  httpd_resp_set_status(req, "303 See Other");
+  httpd_resp_set_hdr(req, "Location", "/login");
+  httpd_resp_send(req, NULL, 0);
+  return ESP_OK;
+}
+
+esp_err_t WebTask::redirectToInfo(httpd_req_t *req) {
+  httpd_resp_set_status(req, "303 See Other");
+  httpd_resp_set_hdr(req, "Location", "/info");
+  httpd_resp_send(req, NULL, 0);
+  return ESP_OK;
+}
+
+String WebTask::reqBumpCookie(httpd_req_t *req) {
+  ip_t requestIp = getReqIp(req);
+
+  std::map<ip_t, session_cookie>::iterator it = connected_clients.find(requestIp);
+  if (it != connected_clients.end()) {
+    it->second.timestamp = millis();
+    return it->second.creationString();
+  }
+
+  return "";
+}
+
+int32_t WebTask::readRequestUntil(httpd_req_t *req, const char terminator, uint8_t *buffer, uint16_t length) {
+  if (length < 1) {
+    return 0;
+  }
+
+  esp_err_t ret = ESP_OK;
+  char      c;
+
+  size_t i = 0;
+  while (i < length) {
+    ret = httpd_req_recv(req, &c, 1);
+    if (ret == 0) {
+      if (i == 0) {
+        return -1;
+      } else {
+        break;
+      }
+    } else if (ret == HTTPD_SOCK_ERR_TIMEOUT) {
+      return -408;
+    } else if (ret == 1 && c == terminator) {
+      break;
+    } else if (ret == 1) {
+      *buffer++ = c;
+      i++;
+    } else {
+      return -500;
+    }
+  }
+
+  return i;
 }

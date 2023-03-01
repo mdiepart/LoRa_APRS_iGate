@@ -3,6 +3,7 @@
 #include <SPIFFS.h>
 #include <WiFiMulti.h>
 #include <ctime>
+#include <esp_https_server.h>
 #include <logger.h>
 #include <queue>
 #include <string>
@@ -98,13 +99,18 @@ void PacketLoggerTask::worker() {
       }
       if (parse_number) {
         csv_file.seek(1, SeekCur);
-        // Read the number, store it to counter
-        String prev_number = csv_file.readStringUntil(SEPARATOR[0]);
-        APP_LOGD(getName(), "prev_number is %s", prev_number.c_str());
-        long int n = prev_number.toInt();
-        APP_LOGD(getName(), "n is thus equal to %d", n);
-        _counter = (n < SIZE_MAX) ? n + 1 : SIZE_MAX;
-        APP_LOGD(getName(), "Found a valid previous entry in packets logs. Counter initialized to %d.", _counter);
+
+        if (csv_file.position() >= csv_file.size()) {
+          _counter = 0;
+        } else {
+          // Read the number, store it to counter
+          String prev_number = csv_file.readStringUntil(SEPARATOR[0]);
+          APP_LOGD(getName(), "prev_number is %s", prev_number.c_str());
+          long int n = prev_number.toInt();
+          APP_LOGD(getName(), "n is thus equal to %d", n);
+          _counter = (n < SIZE_MAX) ? n + 1 : SIZE_MAX;
+          APP_LOGD(getName(), "Found a valid previous entry in packets logs. Counter initialized to %d.", _counter);
+        }
       }
       csv_file.close();
       getTail(false);
@@ -261,8 +267,11 @@ String PacketLoggerTask::getTail(bool use_cache) {
   return _tail;
 }
 
-bool PacketLoggerTask::getFullLogs(WiFiClient &client) {
-  client.println(HEADER);
+bool PacketLoggerTask::getFullLogs(httpd_req_t *req) {
+  httpd_resp_set_type(req, "text/plain");
+  httpd_resp_set_hdr(req, "Content-Disposition", "attachment; filename=\"packets.log\"");
+  httpd_resp_sendstr_chunk(req, HEADER.c_str());
+
   size_t counter = 0;
   File   csv_file;
   String log_line;
@@ -276,7 +285,9 @@ bool PacketLoggerTask::getFullLogs(WiFiClient &client) {
       while (csv_file.position() < csv_file.size()) {
         csv_file.readStringUntil('\t');
         log_line = csv_file.readStringUntil('\n');
-        client.printf("%d\t%s\n", counter++, log_line.c_str());
+        char full_line[256];
+        snprintf(full_line, sizeof(full_line), "%d\t%s\n", counter++, log_line.c_str());
+        httpd_resp_sendstr_chunk(req, full_line);
       }
       csv_file.close();
     }
@@ -285,16 +296,19 @@ bool PacketLoggerTask::getFullLogs(WiFiClient &client) {
   // Read from current file
   csv_file = SPIFFS.open("/" + _filename, "r");
   if (!csv_file) {
+    httpd_resp_sendstr_chunk(req, NULL);
     return false;
   }
   csv_file.readStringUntil('\n'); // Discard header
   while (csv_file.position() < csv_file.size()) {
     csv_file.readStringUntil('\t');
     log_line = csv_file.readStringUntil('\n');
-    client.printf("%d\t%s\n", counter++, log_line.c_str());
+    char full_line[256];
+    snprintf(full_line, sizeof(full_line), "%d\t%s\n", counter++, log_line.c_str());
+    httpd_resp_sendstr_chunk(req, full_line);
   }
   csv_file.close();
-
+  httpd_resp_sendstr_chunk(req, NULL);
   return true;
 }
 
