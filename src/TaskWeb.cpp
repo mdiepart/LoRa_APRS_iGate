@@ -29,9 +29,12 @@ void WebTask::worker() {
   }
 
   httpd_ssl_config_t https_config = HTTPD_SSL_CONFIG_DEFAULT();
-  isServerStarted                 = false;
-  _stateInfo                      = "Awaiting network";
-  https_config.httpd.core_id      = 1;
+  httpd_config_t     http_config  = HTTPD_DEFAULT_CONFIG();
+
+  isServerStarted            = false;
+  _stateInfo                 = "Awaiting network";
+  https_config.httpd.core_id = 1;
+  http_config.core_id        = 1;
   extern const unsigned char https_cert_start[] asm("_binary_ssl_servercert_pem_start");
   extern const unsigned char https_cert_end[] asm("_binary_ssl_servercert_pem_end");
   extern const unsigned char https_key_start[] asm("_binary_ssl_prvtkey_pem_start");
@@ -41,8 +44,10 @@ void WebTask::worker() {
   https_config.prvtkey_pem           = https_key_start;
   https_config.prvtkey_len           = https_key_end - https_key_start;
   https_config.httpd.global_user_ctx = this;
+  http_config.global_user_ctx        = this;
   // https_config.httpd.global_user_ctx_free_fn = free_context;
   https_config.httpd.stack_size = 25 * 1024;
+  http_config.stack_size        = 25 * 1024;
 
   httpd_uri_t info_uri        = {.uri = "/info", .method = HTTP_GET, .handler = info_wrapper};
   httpd_uri_t enableota_uri   = {.uri = "/enableOTA", .method = HTTP_POST, .handler = enableota_wrapper};
@@ -53,7 +58,8 @@ void WebTask::worker() {
   httpd_uri_t root_uri        = {.uri = "/", .method = HTTP_GET, .handler = root_wrapper};
   httpd_uri_t packets_log_uri = {.uri = "/packets.log", .method = HTTP_GET, .handler = download_packets_logs_wrapper};
 
-  esp_err_t ret   = httpd_ssl_start(&httpd_handle, &https_config);
+  // esp_err_t ret   = httpd_ssl_start(&httpd_handle, &https_config);
+  esp_err_t ret   = httpd_start(&httpd_handle, &http_config);
   isServerStarted = true;
 
   APP_LOGD(getName(), "httpd_ssl_start returned %d", ret);
@@ -119,17 +125,6 @@ String WebTask::loadPage(String file) const {
   return pageString;
 }
 
-/**
- * @brief   Read bytes from a request until a double CRLF is found.
- *
- *
- * @param[in] req The request the data should be read from
- *
- * @param[in] length Maximum number of bytes to read
- *
- * @return
- *  - String : String containing the data read (including CRLFCRLF)
- */
 String WebTask::readCRLFCRLF(httpd_req_t *req, size_t length) const {
   String str = "";
   char   c;
@@ -152,11 +147,13 @@ String WebTask::readCRLFCRLF(httpd_req_t *req, size_t length) const {
       ret = httpd_req_recv(req, lfcrlf, 3);
       if (ret >= 0 && ret < 3) {
         str += lfcrlf;
+        i += ret;
         return str;
       } else if (ret == 3 && (strcmp(lfcrlf, "\n\r\n") == 0)) {
         str += lfcrlf;
         return str;
       } else if (ret == 3) {
+        i += ret;
         str += lfcrlf;
       } else { // Error
         APP_LOGE(getName(), "readCRLFCRLF: httpd_req_recv returned %d", ret);
@@ -278,10 +275,6 @@ esp_err_t WebTask::uploadfw_page(httpd_req_t *req) {
   if (!isClientLoggedIn(req)) {
     return redirectToLogin(req);
   }
-  // const String str_content_type = "Content-Type: multipart/form-data;";
-  // const String str_content_length = "Content-Length: ";
-  const String str_boundary = "boundary=";
-  String       boundary_token;
 
   // Read content type to retrieve boundary token
   size_t content_type_len = httpd_req_get_hdr_value_len(req, "Content-Type");
@@ -293,34 +286,40 @@ esp_err_t WebTask::uploadfw_page(httpd_req_t *req) {
     return httpd_resp_send_500(req);
   }
   httpd_req_get_hdr_value_str(req, "Content-Type", content_type_str, content_type_len);
-  APP_LOGD(getName(), "Content-Type length is %d, string is \"%s\".", content_type_len, content_type_str);
-  // Fetch boundary token
-  String content_type = String(content_type_str, content_type_len);
-  boundary_token      = "--" + content_type.substring(content_type.indexOf(str_boundary) + str_boundary.length());
-  APP_LOGD(getName(), "The boundary to compare with is %s.", boundary_token.c_str());
+
+  //  Fetch boundary token
+  const String str_boundary   = "boundary=";
+  String       content_type   = String(content_type_str, content_type_len);
+  String       boundary_token = "--" + content_type.substring(content_type.indexOf(str_boundary) + str_boundary.length());
 
   // Finished parsing header. Now parsing form data
-  const size_t BUFFER_LENGTH                  = 511;
-  uint8_t      full_buffer[BUFFER_LENGTH + 3] = {0}; // add two bytes to allow prepending data when LF was read, add 1 for terminator
-  uint8_t     *read_buffer                    = full_buffer + 2;
-  full_buffer[1]                              = '\n'; // This char will always be '\n'
-  String    name;
-  String    filename;
-  esp_err_t esp_error = ESP_OK;
+  const size_t BUFFER_LENGTH = 511;
+  uint8_t      read_buffer[BUFFER_LENGTH];
+  size_t       length = BUFFER_LENGTH;
+  String       name;
+  String       filename;
+  esp_err_t    esp_error = ESP_OK;
 
   // Read a line. It should be the first boundary of the form-data
-  size_t boundary_len           = readRequestUntil(req, '\n', read_buffer, BUFFER_LENGTH);
-  read_buffer[boundary_len - 1] = '\0'; // Replace '\r' by '\0'
-  APP_LOGD("uploadFW", "boundary token = %s, buffer = %s.", boundary_token.c_str(), read_buffer);
+  int32_t ret = readRequestUntilCRLF(req, read_buffer, &length);
+
   if (strcmp(boundary_token.c_str(), (const char *)read_buffer) == 0) { // We found a boundary token. It should be at the beginning of a form part
     while (esp_error == ESP_OK) {
-      String headerStr = readCRLFCRLF(req, 2048); // Read the header that is just after the boundary
-      // Determine field name
-      APP_LOGD(getName(), "headerStr = \"%s\".", headerStr.c_str());
-      if (headerStr.isEmpty()) { // Error while reading header
+      length = BUFFER_LENGTH;
+      ret    = readRequestUntilCRLFCRLF(req, read_buffer, &length);
+      if (ret == 0) {
+        // End of stream
+        APP_LOGD(getName(), "Uplaod firmware: finished parsing request.");
+        break;
+      } else if (ret != 2) {
+        // We did not read CRLFCRLF
+        APP_LOGD(getName(), "error receiving multipart header, it is \"%s\"", read_buffer);
         esp_error = ESP_FAIL;
         break;
-      } else if (headerStr.indexOf(boundary_token + "--\r\n") >= 0) { // End of multiform
+      }
+
+      String headerStr(read_buffer, length);
+      if (headerStr.indexOf(boundary_token + "--\r\n") >= 0) { // End of multiform
         break;
       }
       name     = headerStr.substring(headerStr.indexOf("name=\"") + strlen("name=\""), headerStr.indexOf("\"; filename"));
@@ -333,201 +332,18 @@ esp_err_t WebTask::uploadfw_page(httpd_req_t *req) {
           APP_LOGD(getName(), "No firmware file, skipping.");
           continue;
         }
-
-        size_t                 file_size = 0;
-        int                    len;
-        const esp_partition_t *next_part = esp_ota_get_next_update_partition(NULL);
-        esp_ota_handle_t       ota_handle;
-        bool                   data_prepended = false;
-        esp_error                             = esp_ota_begin(next_part, OTA_SIZE_UNKNOWN, &ota_handle);
-
-        if (esp_error != ESP_OK) {
-          APP_LOGW(getName(), "Error starting OTA.");
-          break;
-        }
-
-        // While there is data available and we haven't read the boundary token
-        while (esp_error == ESP_OK) {
-          // Updating is gonna take some time so we need to reset watchdog.
-          esp_task_wdt_reset();
-          // Read from client and check if read was valid
-          len = readRequestUntil(req, '\n', read_buffer, BUFFER_LENGTH);
-          if (len < 0) {
-            APP_LOGD(getName(), "readRequestUntil returned %d", len);
-            esp_error = ESP_FAIL;
-            break;
-          } else if (len == 0) {
-            read_buffer[0] = '\n';
-            size_t tmp     = readRequestUntil(req, '\n', read_buffer + 1, BUFFER_LENGTH - 1);
-            if (len < 0) {
-              esp_error = ESP_FAIL;
-              APP_LOGD(getName(), "readRequestUntil returned %d", tmp);
-              break;
-            }
-            len = 1 + tmp;
-            // system->log_info(getName(), "read with len < 1");
-          }
-
-          // If we have read the boundary
-          if (len < BUFFER_LENGTH && strstr((const char *)read_buffer, boundary_token.c_str()) != NULL) {
-            // Found end boundary
-            break; // Escape from parsing loop
-          } else {
-            uint8_t *data;
-            bool     prepend_again = false;
-
-            if (len < BUFFER_LENGTH) {
-              // We found a terminator... We store the last byte in case they are the CRLF just before the boundary
-              prepend_again = true;
-              len--;
-            }
-
-            if (data_prepended) {
-              // We will be using full_buffer instead of read_buffer
-              data = full_buffer;
-              len += 2;
-              data_prepended = false;
-            } else {
-              data = read_buffer;
-            }
-
-            if (len < 0) {
-              APP_LOGI(getName(), "len < 0");
-            }
-            esp_ota_write(ota_handle, data, len);
-
-            // At this point, if data_prepended is true, that means that the last byte read must be placed in the "prepend" part of the buffer
-            if (prepend_again) {
-              full_buffer[0] = data[len];
-              data_prepended = true;
-              prepend_again  = false;
-            }
-            file_size += len;
-          }
-        }
-
-        APP_LOGD(getName(), "Finished parsing binary file. Size is %d", file_size);
-
-        if (esp_error == ESP_OK) {
-          esp_error = esp_ota_end(ota_handle);
-        } else {
-          // esp_ota_abort(ota_handle);
-          APP_LOGD(getName(), "Error while writing to ota. Code is %d", esp_error);
-        }
-
-        switch (esp_error) {
-        case ESP_OK:
-          APP_LOGD(getName(), "OTA Succeeded.");
-          esp_ota_set_boot_partition(next_part);
-          break;
-        case ESP_ERR_NOT_FOUND:
-          APP_LOGW(getName(), "ESP_ERR_NOT_FOUND.");
-          break;
-        case ESP_ERR_INVALID_ARG:
-          APP_LOGW(getName(), "ESP_ERR_INVALID_ARG.");
-          break;
-        case ESP_ERR_OTA_VALIDATE_FAILED:
-          APP_LOGW(getName(), "ESP_ERR_OTA_VALIDATE_FAILED.");
-          break;
-        case ESP_ERR_INVALID_STATE:
-          APP_LOGW(getName(), "ESP_ERR_INVALID_STATE.");
-          break;
-        default:
-          APP_LOGW(getName(), "ESP OTA unknown error...");
-          break;
-        }
+        parseAndWriteFirmware(req, boundary_token);
       } else if (name.equals("SPIFFS_File")) {
         if (filename.isEmpty()) { // Do not update spiffs if we have no SPIFFS file
           APP_LOGD(getName(), "No SPIFFS file uploaded. Skipping.");
           continue;
         }
 
-        size_t                   file_size = 0;
-        int                      len;
-        esp_partition_iterator_t spiffs_part_it = esp_partition_find(ESP_PARTITION_TYPE_DATA, ESP_PARTITION_SUBTYPE_DATA_SPIFFS, NULL);
-        const esp_partition_t   *spiffs_part    = esp_partition_get(spiffs_part_it);
-        esp_partition_iterator_release(spiffs_part_it);
-
-        bool data_prepended = 0;
-
-        esp_error = esp_partition_erase_range(spiffs_part, 0, spiffs_part->size);
-        if (esp_error != ESP_OK) {
-          APP_LOGW(getName(), "Impossible to erase SPIFFS partition...");
-          break;
-        }
-
-        // While there is data available and we haven't read the boundary token
-        while (esp_error == ESP_OK) {
-          // Updating is gonna take some time so we need to reset watchdog.
-          esp_task_wdt_reset();
-
-          // Read from client and check if read was valid
-          len = readRequestUntil(req, '\n', read_buffer, BUFFER_LENGTH);
-          if (len < 0) {
-            APP_LOGD(getName(), "readRequestUntil returned %d", len);
-            esp_error = ESP_FAIL;
-            break;
-          } else if (len == 0) {
-            read_buffer[0] = '\n';
-            size_t tmp     = readRequestUntil(req, '\n', read_buffer + 1, BUFFER_LENGTH - 1);
-            if (len < 0) {
-              esp_error = ESP_FAIL;
-              APP_LOGD(getName(), "readRequestUntil returned %d", tmp);
-              break;
-            }
-            len = 1 + tmp;
-            // system->log_info(getName(), "read with len < 1");
-          }
-
-          // If we have read the boundary
-          if (len < BUFFER_LENGTH && strstr((const char *)read_buffer, boundary_token.c_str()) != NULL) {
-            // Found end boundary
-            break; // Escape from parsing loop
-          } else {
-            uint8_t *data;
-            bool     prepend_again = false;
-
-            if (len < BUFFER_LENGTH) {
-              // We found a terminator... We store the last byte in case they are the CRLF just before the boundary
-              prepend_again = true;
-              len--;
-            }
-
-            if (data_prepended) {
-              // We will be using full_buffer instead of read_buffer
-              len += 2;
-              data_prepended = false;
-              data           = full_buffer;
-            } else {
-              data = read_buffer;
-            }
-
-            esp_error = esp_partition_write(spiffs_part, file_size, data, len);
-
-            // At this point, if data_prepended is true, that means that the last byte read must be placed in the "prepend" part of the buffer
-            if (prepend_again) {
-              full_buffer[0] = data[len];
-              data_prepended = true;
-              prepend_again  = false;
-            }
-            file_size += len;
-          }
-        }
-
-        if (esp_error != ESP_OK) {
-          APP_LOGW(getName(), "Error %d while writing to spiffs partition.", esp_error);
-          break;
-        }
+        parseAndWriteSPIFFS(req, boundary_token);
       }
     }
-    /*else if ((boundary_token + "--").equals(buffer)) {
-      // we found the end of form boundary
-      system->log_debug(getName(), "Finished parsing full request.");
-      break;
-    }
-    */
   } else {
-    // No token where one is expected
+    // No boundary token where one is expected
     APP_LOGW(getName(), "Could not find firmware data.");
     return httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Bad Request");
   }
@@ -768,8 +584,8 @@ String WebTask::reqBumpCookie(httpd_req_t *req) {
   return "";
 }
 
-int32_t WebTask::readRequestUntil(httpd_req_t *req, const char terminator, uint8_t *buffer, uint16_t length) {
-  if (length < 1) {
+int32_t WebTask::readRequestUntil(httpd_req_t *req, const char terminator, uint8_t *buffer, size_t *length) {
+  if (*length < 1) {
     return 0;
   }
 
@@ -777,7 +593,7 @@ int32_t WebTask::readRequestUntil(httpd_req_t *req, const char terminator, uint8
   char      c;
 
   size_t i = 0;
-  while (i < length) {
+  while (i < *length) {
     ret = httpd_req_recv(req, &c, 1);
     if (ret == 0) {
       if (i == 0) {
@@ -787,15 +603,252 @@ int32_t WebTask::readRequestUntil(httpd_req_t *req, const char terminator, uint8
       }
     } else if (ret == HTTPD_SOCK_ERR_TIMEOUT) {
       return -408;
-    } else if (ret == 1 && c == terminator) {
-      break;
     } else if (ret == 1) {
       *buffer++ = c;
       i++;
+      if (c == terminator) {
+        *length = i;
+        return 2;
+      }
     } else {
       return -500;
     }
   }
 
-  return i;
+  *length = i;
+  return 1;
+}
+
+int32_t WebTask::readRequestUntilCRLFCRLF(httpd_req_t *req, uint8_t *buffer, size_t *length) {
+
+  if (length == 0) {
+    return 0;
+  }
+
+  char   c;
+  size_t i = 0;
+  int    ret;
+
+  // As long as there is no error or no CR have been read, read up to length-3 chars
+  // We can not read more than length-2 characters because if the last character that
+  // we read is a LF not belonging to a CRLFCRLF sequence, we will not be able to put
+  // back in the request the 2 characters read that would not fit the buffer
+  while (i < (*length) - 2) {
+    // i = the number of chars read
+    ret = httpd_req_recv(req, &c, 1);
+
+    if (ret != 1) { // Error, set length and return
+      *length = i;
+      return ret;
+    } else if (c == '\n') { // Read LF
+
+      // Check that prev char is not CR and next char is not CR
+      ret = httpd_req_recv(req, &c, 1);
+      if (ret != 1) { // Error, put '\n' in buffer and set length before returning
+        buffer[i] = '\n';
+        *length   = i + 1;
+        return ret;
+      } else if (buffer[i - 1] == '\r' && c == '\r') { // Read CR
+        // Check that next char is not LF
+        ret = httpd_req_recv(req, &c, 1);
+        if (ret != 1) { // Error
+          buffer[i]     = '\n';
+          buffer[i + 1] = '\r';
+          *length       = i + 2;
+          return ret;
+        } else if (c == '\n') { // Successfully read CRLFCRLF.
+          buffer[i] = '\0';
+          *length   = i - 1;
+          return 2;
+        } else {
+          buffer[i]     = '\n';
+          buffer[i + 1] = '\r';
+          buffer[i + 2] = c;
+          i += 3;
+        }
+      } else {
+        buffer[i]     = '\n';
+        buffer[i + 1] = c;
+        i += 2;
+      }
+
+    } else { // Read one char that is not CR
+      buffer[i] = c;
+      i++;
+    }
+  }
+
+  *length = i;
+  return 1;
+}
+
+int32_t WebTask::readRequestUntilCRLF(httpd_req_t *req, uint8_t *buffer, size_t *length) {
+
+  if (length == 0) {
+    return 0;
+  }
+
+  size_t read_bytes = 0;
+  while (read_bytes < *length) {
+    size_t  read_length = *length - read_bytes;
+    int32_t ret         = readRequestUntil(req, '\n', buffer + read_bytes, &read_length);
+
+    read_bytes += read_length;
+
+    if (ret == 2 && read_bytes >= 2 && buffer[read_bytes - 2] == '\r') {
+      *length                = read_bytes - 2;
+      buffer[read_bytes - 2] = '\0';
+      return 2;
+    }
+  }
+
+  *length = read_bytes;
+  return 1;
+}
+
+esp_err_t WebTask::parseAndWriteFirmware(httpd_req_t *req, String boundary_token) const {
+
+  size_t                 file_size = 0;
+  const esp_partition_t *next_part = esp_ota_get_next_update_partition(NULL);
+  esp_ota_handle_t       ota_handle;
+  esp_err_t              esp_error     = esp_ota_begin(next_part, OTA_SIZE_UNKNOWN, &ota_handle);
+  constexpr size_t       BUFFER_LENGTH = 511;
+  uint8_t                read_buffer[BUFFER_LENGTH];
+  bool                   waitingCRLF = false;
+
+  if (esp_error != ESP_OK) {
+    APP_LOGE(getName(), "Error starting OTA.");
+    return esp_error;
+  }
+
+  // While there is data available and we haven't read the boundary token
+  while (esp_error == ESP_OK) {
+    // Updating is gonna take some time so we need to reset watchdog.
+    esp_task_wdt_reset();
+    size_t  read_length = BUFFER_LENGTH;
+    int32_t ret         = readRequestUntilCRLF(req, read_buffer, &read_length);
+
+    // If a CRLFCRLF sequence was previously read but not written, do it now
+
+    if (ret == 1) { // We did not reach a CRLF
+      if (waitingCRLF) {
+        esp_error   = esp_ota_write(ota_handle, "\r\n", 2);
+        waitingCRLF = false;
+        file_size += 2;
+      }
+      esp_error = esp_ota_write(ota_handle, read_buffer, read_length);
+      file_size += read_length;
+    } else if (ret == 2) { // We read a CRLFCRLF. Check if it is the boundary token
+      if (String(read_buffer, read_length).indexOf(boundary_token) == 0) {
+        APP_LOGD(getName(), "Reached end of firmware file");
+        break;
+      } else { // This line does not contain a boundary token
+        if (waitingCRLF) {
+          esp_error   = esp_ota_write(ota_handle, "\r\n", 2);
+          waitingCRLF = false;
+          file_size += 2;
+        }
+        // Write the data read except for the final CRLF
+        esp_error = esp_ota_write(ota_handle, read_buffer, read_length);
+        file_size += read_length;
+      }
+      waitingCRLF = true;
+    } else {
+      esp_ota_abort(ota_handle);
+      break;
+    }
+  }
+
+  APP_LOGD(getName(), "Finished parsing binary file. Size is %d", file_size);
+
+  if (esp_error == ESP_OK) {
+    esp_error = esp_ota_end(ota_handle);
+  } else {
+    APP_LOGD(getName(), "Error while writing to ota. Code is %d", esp_error);
+  }
+
+  switch (esp_error) {
+  case ESP_OK:
+    APP_LOGD(getName(), "OTA Succeeded.");
+    esp_error = esp_ota_set_boot_partition(next_part);
+    break;
+  case ESP_ERR_NOT_FOUND:
+    APP_LOGW(getName(), "ESP_ERR_NOT_FOUND.");
+    break;
+  case ESP_ERR_INVALID_ARG:
+    APP_LOGW(getName(), "ESP_ERR_INVALID_ARG.");
+    break;
+  case ESP_ERR_OTA_VALIDATE_FAILED:
+    APP_LOGW(getName(), "ESP_ERR_OTA_VALIDATE_FAILED.");
+    break;
+  case ESP_ERR_INVALID_STATE:
+    APP_LOGW(getName(), "ESP_ERR_INVALID_STATE.");
+    break;
+  default:
+    APP_LOGW(getName(), "ESP OTA unknown error...");
+    break;
+  }
+
+  return esp_error;
+}
+
+esp_err_t WebTask::parseAndWriteSPIFFS(httpd_req_t *req, String boundary_token) const {
+  size_t                   file_size      = 0;
+  esp_partition_iterator_t spiffs_part_it = esp_partition_find(ESP_PARTITION_TYPE_DATA, ESP_PARTITION_SUBTYPE_DATA_SPIFFS, NULL);
+  const esp_partition_t   *spiffs_part    = esp_partition_get(spiffs_part_it);
+  esp_partition_iterator_release(spiffs_part_it);
+  esp_err_t        esp_error     = esp_partition_erase_range(spiffs_part, 0, spiffs_part->size);
+  bool             waitingCRLF   = false;
+  constexpr size_t BUFFER_LENGTH = 512;
+  uint8_t          read_buffer[BUFFER_LENGTH];
+
+  if (esp_error != ESP_OK) {
+    APP_LOGW(getName(), "Impossible to erase SPIFFS partition...");
+    return esp_error;
+  }
+
+  // While there is data available and we haven't read the boundary token
+  while (esp_error == ESP_OK) {
+    // Updating is gonna take some time so we need to reset watchdog.
+    esp_task_wdt_reset();
+    size_t  read_length = BUFFER_LENGTH;
+    int32_t ret         = readRequestUntilCRLF(req, read_buffer, &read_length);
+
+    // If a CRLFCRLF sequence was previously read but not written, do it now
+
+    if (ret == 1) { // We did not reach a CRLF
+      if (waitingCRLF) {
+        esp_error   = esp_partition_write(spiffs_part, file_size, "\r\n", 2);
+        waitingCRLF = false;
+        file_size += 2;
+      }
+      esp_error = esp_partition_write(spiffs_part, file_size, read_buffer, read_length);
+      file_size += read_length;
+    } else if (ret == 2) { // We read a CRLFCRLF. Check if it is the boundary token
+      if (String(read_buffer, read_length).indexOf(boundary_token) == 0) {
+        APP_LOGD(getName(), "Reached end of SPIFFS file");
+        break;
+      } else { // This line does not contain a boundary token
+        if (waitingCRLF) {
+          esp_error   = esp_partition_write(spiffs_part, file_size, "\r\n", 2);
+          waitingCRLF = false;
+          file_size += 2;
+        }
+        // Write the data read except for the final CRLF
+        esp_error = esp_partition_write(spiffs_part, file_size, read_buffer, read_length);
+        file_size += read_length;
+      }
+      waitingCRLF = true;
+    } else {
+      break;
+    }
+  }
+
+  APP_LOGD(getName(), "Finished parsing binary file. Size is %d", file_size);
+
+  if (esp_error != ESP_OK) {
+    APP_LOGE(getName(), "Error while writing to SPIFFS partition. Code is %d", esp_error);
+  }
+
+  return esp_error;
 }

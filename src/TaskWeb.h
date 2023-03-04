@@ -33,34 +33,146 @@ private:
 
   std::map<ip_t, struct session_cookie> connected_clients; // Key is ip address, value is cookie
 
-  String           loadPage(String file) const;
-  String           readCRLFCRLF(httpd_req_t *req, size_t length) const;
-  bool             isClientLoggedIn(httpd_req_t *req) const;
-  static void      sanitize(String &string);
-  ip_t             getReqIp(httpd_req_t *req) const;
-  static esp_err_t redirectToLogin(httpd_req_t *req);
-  static esp_err_t redirectToInfo(httpd_req_t *req);
-  String           reqBumpCookie(httpd_req_t *req);
+  /**
+   * @brief     Loads a page from the SPIFFS partition
+   *
+   * @param[in] file A String containing the name of the file to read
+   *
+   * @return    String: A String containing the page read.
+   */
+  String loadPage(String file) const;
 
   /**
-   * @brief   Read bytes from a request until terminator is met or length bytes are read.
+   * @brief     Reads from a request until either length chars have been read or until the substring "\r\n\r\n" is found whichever comes first.
    *
+   * @param[in] req The request to read from.
    *
-   * @param[in] req The request the data should be read from
+   * @param[in] length The maximum number of chars to read.
    *
-   * @param[in] terminator The char until which to read data
+   * @return    String: a String containing the data read, including \r\n\r\n.
    *
-   * @param[in] buffer Buffer in which to store the data read (not including the terminator)
+   * @note      If the character at the length position is "\\r" then three more chars will be read thus the resulting string might be up to length+3 chars long.
+   */
+  String readCRLFCRLF(httpd_req_t *req, size_t length) const;
+
+  /**
+   * @brief       Checks if the client of the given request is logged in
    *
-   * @param[in] length Maximum number of bytes to read
+   * @param[in]   req The request whose login status must be checked
+   *
+   * @return      True if the client is logged in, false otherwise.
+   */
+  bool isClientLoggedIn(httpd_req_t *req) const;
+
+  /**
+   * @brief         Sanitizes a string for displaying in an html document
+   *
+   * The function will escape with the corresponding HTML codes the characters "&", "<", ">", "\\", "'", "\\n", "\\t".
+   * The character "\\t" will be replaced by &emsp
+   *
+   * @param[in,out] string, the string to sanitize
+   */
+  static void sanitize(String &string);
+
+  /**
+   * @brief     Returns the IP address corresponding to the given request.
+   *
+   * @param[in] req The request whose client's ip should be retrieved.
+   *
+   * @return    ip_t: the ip address of the client as an array of four uint32_t
+   */
+  ip_t getReqIp(httpd_req_t *req) const;
+
+  /**
+   * @brief     Redirects the client corresponding to the given request to the login page.
+   *
+   * @param[in] req The request of the client to redirect.
+   *
+   * @return    esp_err_t : the result of the httpd_resp_send function.
+   *
+   * @note      After this function, the request is sent and no more data can be sent to the client.
+   */
+  static esp_err_t redirectToLogin(httpd_req_t *req);
+
+  /**
+   * @brief     Redirects the client corresponding to the given request to the info page.
+   *
+   * @param[in] req The request of the client to redirect.
+   *
+   * @return    esp_err_t : the result of the httpd_resp_send function.
+   *
+   * @note      After this function, the request is sent and no more data can be sent to the client.
+   */
+  static esp_err_t redirectToInfo(httpd_req_t *req);
+
+  /**
+   * @brief     Updates the timestamp of the cookie corresponding to the given request.
+   *
+   * @param[in] req The request whose corresponding cookie should be bumped.
+   *
+   * @return    String containing the HTTP creation string (for the Set-Cookie header).
+   */
+  String reqBumpCookie(httpd_req_t *req);
+
+  /**
+   * @brief     Read bytes from a request until terminator is met or length bytes are read.
+   *
+   * @param[in] req The request the data should be read from.
+   *
+   * @param[in] terminator The char until which to read data.
+   *
+   * @param[in] buffer Buffer in which to store the data read (not including the terminator).
+   *
+   * @param[in,out] length Size of the buffer passed as argument. When the function returns, it will contain the number of bytes read.
    *
    * @return
-   *  - Number of bytes read: The number of bytes read from the request (not including the terminator)
-   *  - -1   : Connexion closed (no data read)
-   *  - -408 : The read timed out
-   *  - -500 : There was an error while reading from the request.
+   *  2 : finished, CRLFCRLF found
+   *  1 : finished, no CRLFCRLF found
+   *  other : an error returned by httpd_req_recv;
    */
-  static int32_t readRequestUntil(httpd_req_t *req, const char terminator, uint8_t *buffer, uint16_t length);
+  static int32_t readRequestUntil(httpd_req_t *req, const char terminator, uint8_t *buffer, size_t *length);
+
+  /**
+   * @brief Read bytes from a request until either the buffer is full or a CRLFCRLF token is reached.
+   *
+   * If no CRLFCRLF token is found, the buffer won't contain more than length-2 bytes.
+   *
+   * @param[in] req The request the data should be read from.
+   *
+   * @param[out] buffer The buffer in which the data read will be stored
+   *
+   * @param[in,out] length Size of the buffer passed as argument. When the function returns, it will contain the number of bytes read.
+   *
+   * @return
+   *  2 : finished, CRLFCRLF found
+   *  1 : finished, no CRLFCRLF found
+   *  other : an error returned by httpd_req_recv;
+   *
+   * @note If a CRLFCRLF is read, it will not be stored in the buffer.
+   *
+   */
+  static int32_t readRequestUntilCRLFCRLF(httpd_req_t *req, uint8_t *buffer, size_t *length);
+
+  /**
+   * @brief Read bytes from a request until either the buffer is full or a CRLF token is reached.
+   *
+   * @param[in] req The request the data should be read from.
+   *
+   * @param[out] buffer The buffer in which the data read will be stored
+   *
+   * @param[in,out] length Size of the buffer passed as argument. When the function returns, it will contain the number of bytes read.
+   *
+   * @return
+   *  2 : finished, CRLF found
+   *  1 : finished, no CRLF found
+   *  other : an error returned by httpd_req_recv;
+   *
+   * @note If a CRLF is read, it will not be stored in the buffer.
+   */
+  static int32_t readRequestUntilCRLF(httpd_req_t *req, uint8_t *buffer, size_t *length);
+
+  esp_err_t parseAndWriteFirmware(httpd_req_t *req, String boundary_token) const;
+  esp_err_t parseAndWriteSPIFFS(httpd_req_t *req, String boundary_token) const;
 
   esp_err_t info_page(httpd_req_t *req);
   esp_err_t enableota_page(httpd_req_t *req);
