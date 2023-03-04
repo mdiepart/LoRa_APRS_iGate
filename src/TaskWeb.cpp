@@ -58,8 +58,8 @@ void WebTask::worker() {
   httpd_uri_t root_uri        = {.uri = "/", .method = HTTP_GET, .handler = root_wrapper};
   httpd_uri_t packets_log_uri = {.uri = "/packets.log", .method = HTTP_GET, .handler = download_packets_logs_wrapper};
 
-  // esp_err_t ret   = httpd_ssl_start(&httpd_handle, &https_config);
-  esp_err_t ret   = httpd_start(&httpd_handle, &http_config);
+  esp_err_t ret = httpd_ssl_start(&httpd_handle, &https_config);
+  // esp_err_t ret   = httpd_start(&httpd_handle, &http_config);
   isServerStarted = true;
 
   APP_LOGD(getName(), "httpd_ssl_start returned %d", ret);
