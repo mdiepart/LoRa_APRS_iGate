@@ -5,6 +5,7 @@
 #include <FS.h>
 #include <TaskManager.h>
 #include <WiFiMulti.h>
+#include <esp_https_server.h>
 #include <queue>
 #include <stdio.h>
 
@@ -19,7 +20,7 @@ public:
   void worker() override;
 
   String getTail(bool use_cache = true);
-  bool   getFullLogs(WiFiClient &client);
+  bool   getFullLogs(httpd_req_t *req);
 
 private:
   void rotate();
@@ -32,7 +33,7 @@ private:
   unsigned int   _total_count;
   String         _filename;
   String         _tail;
-  const String   HEADER = String("NUMBER" SEPARATOR "TIMESTAMP" SEPARATOR "CALLSIGN" SEPARATOR "TARGET" SEPARATOR "PATH" SEPARATOR "DATA" SEPARATOR "RSSI" SEPARATOR "SNR" SEPARATOR "FREQ_ERROR");
+  const String   HEADER = String("NUMBER" SEPARATOR "TIMESTAMP" SEPARATOR "CALLSIGN" SEPARATOR "TARGET" SEPARATOR "PATH" SEPARATOR "DATA" SEPARATOR "RSSI" SEPARATOR "SNR" SEPARATOR "FREQ_ERROR\n");
   System        &_system;
   QueueHandle_t &_toPacketLogger;
 };
