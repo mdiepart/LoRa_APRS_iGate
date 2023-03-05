@@ -33,7 +33,7 @@ private:
   unsigned int   _total_count;
   String         _filename;
   String         _tail;
-  const String   HEADER = String("NUMBER" SEPARATOR "TIMESTAMP" SEPARATOR "CALLSIGN" SEPARATOR "TARGET" SEPARATOR "PATH" SEPARATOR "DATA" SEPARATOR "RSSI" SEPARATOR "SNR" SEPARATOR "FREQ_ERROR");
+  const String   HEADER = String("NUMBER" SEPARATOR "TIMESTAMP" SEPARATOR "CALLSIGN" SEPARATOR "TARGET" SEPARATOR "PATH" SEPARATOR "DATA" SEPARATOR "RSSI" SEPARATOR "SNR" SEPARATOR "FREQ_ERROR\n");
   System        &_system;
   QueueHandle_t &_toPacketLogger;
 };
