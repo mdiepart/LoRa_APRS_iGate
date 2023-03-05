@@ -7,7 +7,7 @@
 #include "TaskDisplay.h"
 #include "project_configuration.h"
 
-DisplayTask::DisplayTask(UBaseType_t priority, BaseType_t coreId, const bool displayOnScreen, System &system, QueueHandle_t &toDisplay, const char *version) : FreeRTOSTask(TASK_DISPLAY, TaskDisplay, priority, 2048, coreId, displayOnScreen), _toDisplay(toDisplay), _displaySaveMode(false), _version(version), _system(system) {
+DisplayTask::DisplayTask(UBaseType_t priority, BaseType_t coreId, const bool displayOnScreen, System &system, QueueHandle_t &toDisplay, const char *version) : FreeRTOSTask(TASK_DISPLAY, TaskDisplay, priority, 2048, coreId, displayOnScreen), _toDisplay(toDisplay), _displaySaveMode(false), _version(version), _system(system), _disp(NULL) {
   start();
 }
 

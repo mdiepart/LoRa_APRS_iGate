@@ -291,7 +291,7 @@ esp_err_t WebTask::uploadfw_page(httpd_req_t *req) {
   const String str_boundary   = "boundary=";
   String       content_type   = String(content_type_str, content_type_len);
   String       boundary_token = "--" + content_type.substring(content_type.indexOf(str_boundary) + str_boundary.length());
-
+  delete[] content_type_str;
   // Finished parsing header. Now parsing form data
   const size_t BUFFER_LENGTH = 511;
   uint8_t      read_buffer[BUFFER_LENGTH];
@@ -399,7 +399,7 @@ esp_err_t WebTask::login_page(httpd_req_t *req) {
     }
     httpd_req_recv(req, pcBody, req->content_len);
     String body(pcBody, req->content_len);
-    delete pcBody;
+    delete[] pcBody;
 
     // Check password
     size_t i        = body.indexOf("Password=");
@@ -486,7 +486,7 @@ bool WebTask::isClientLoggedIn(httpd_req_t *req) const {
   }
   if (ret == ESP_ERR_HTTPD_RESULT_TRUNC) {
     APP_LOGD(getName(), "httpd_req_get_cookie_val returned RESULT_TRUNC. session_cookie_len=%d.", session_cookie_len);
-    delete session_cookie_str;
+    delete[] session_cookie_str;
     session_cookie_str = new char[session_cookie_len];
   } else {
     APP_LOGD(getName(), "httpd_req_get_cookie_val returned %d. session_cookie_len=%d.", ret, session_cookie_len);
@@ -499,7 +499,7 @@ bool WebTask::isClientLoggedIn(httpd_req_t *req) const {
   ret = httpd_req_get_cookie_val(req, "session", session_cookie_str, &session_cookie_len);
   if (ret != ESP_OK) {
     APP_LOGD(getName(), "Could not get cookie (returned %d)", ret);
-    delete session_cookie_str;
+    delete[] session_cookie_str;
     return false;
   }
 
@@ -508,13 +508,13 @@ bool WebTask::isClientLoggedIn(httpd_req_t *req) const {
 
   // Check that the stored cookie match the given one, and that the cookie did not timeout.
   if ((it != connected_clients.cend()) && it->second.value.equals(session_cookie_str) && (millis() - it->second.timestamp < SESSION_LIFETIME)) {
-    delete session_cookie_str;
+    delete[] session_cookie_str;
     return true;
   }
 
   APP_LOGD(getName(), "Cookie does not match.");
 
-  delete session_cookie_str;
+  delete[] session_cookie_str;
   return false;
 }
 

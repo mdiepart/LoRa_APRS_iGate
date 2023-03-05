@@ -141,8 +141,8 @@ void PacketLoggerTask::worker() {
     char *line = NULL;
     char  timestamp[21];
     strftime(timestamp, sizeof(timestamp), "%FT%TZ", &timeInfo);
-    const char fmt[] = "%u" /* counter */ SEPARATOR "%s" /* timestamp*/ SEPARATOR "%s" /* callsign */ SEPARATOR //
-                       "%s" /* target */ SEPARATOR "%s" /* path */ SEPARATOR "%s" /* data */ SEPARATOR          //
+    const char fmt[] = "%zu" /* counter */ SEPARATOR "%s" /* timestamp*/ SEPARATOR "%s" /* callsign */ SEPARATOR //
+                       "%s" /* target */ SEPARATOR "%s" /* path */ SEPARATOR "%s" /* data */ SEPARATOR           //
                        "%.1f" /* RSSI */ SEPARATOR "%.1f" /* SNR */ SEPARATOR "%.1f\n" /* freq_error */;
 
     /* Create line buffer */
@@ -202,7 +202,7 @@ void PacketLoggerTask::rotate() {
   // Remove oldest file if it exists
   char target_file[32] = {0};
   char origin_file[32] = {0};
-  snprintf(origin_file, 32, "/%s.%u", _filename.c_str(), _nb_files - 1);
+  snprintf(origin_file, 32, "/%s.%zu", _filename.c_str(), _nb_files - 1);
 
   if (SPIFFS.remove(origin_file) == ESP_OK) {
     APP_LOGD(getName(), "Deleted file %s.", origin_file);
@@ -286,7 +286,7 @@ bool PacketLoggerTask::getFullLogs(httpd_req_t *req) {
         csv_file.readStringUntil('\t');
         log_line = csv_file.readStringUntil('\n');
         char full_line[256];
-        snprintf(full_line, sizeof(full_line), "%d\t%s\n", counter++, log_line.c_str());
+        snprintf(full_line, sizeof(full_line), "%zu\t%s\n", counter++, log_line.c_str());
         httpd_resp_sendstr_chunk(req, full_line);
       }
       csv_file.close();
@@ -304,7 +304,7 @@ bool PacketLoggerTask::getFullLogs(httpd_req_t *req) {
     csv_file.readStringUntil('\t');
     log_line = csv_file.readStringUntil('\n');
     char full_line[256];
-    snprintf(full_line, sizeof(full_line), "%d\t%s\n", counter++, log_line.c_str());
+    snprintf(full_line, sizeof(full_line), "%zu\t%s\n", counter++, log_line.c_str());
     httpd_resp_sendstr_chunk(req, full_line);
   }
   csv_file.close();
