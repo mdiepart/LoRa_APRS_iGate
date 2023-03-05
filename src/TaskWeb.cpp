@@ -28,26 +28,27 @@ void WebTask::worker() {
     vTaskDelay(pdMS_TO_TICKS(1000));
   }
 
-  httpd_ssl_config_t https_config = HTTPD_SSL_CONFIG_DEFAULT();
-  httpd_config_t     http_config  = HTTPD_DEFAULT_CONFIG();
+  httpd_ssl_config_t https_config    = HTTPD_SSL_CONFIG_DEFAULT();
+  isServerStarted                    = false;
+  _stateInfo                         = "Awaiting network";
+  https_config.httpd.core_id         = 1;
+  https_config.httpd.global_user_ctx = this;
+  https_config.httpd.stack_size      = 25 * 1024;
 
-  isServerStarted            = false;
-  _stateInfo                 = "Awaiting network";
-  https_config.httpd.core_id = 1;
-  http_config.core_id        = 1;
+#if ENABLE_HTTPS == 1 // See file ssl/enable_HTTPS.md, defined in platformio.ini
+  https_config.transport_mode = HTTPD_SSL_TRANSPORT_SECURE;
   extern const unsigned char https_cert_start[] asm("_binary_ssl_servercert_pem_start");
   extern const unsigned char https_cert_end[] asm("_binary_ssl_servercert_pem_end");
   extern const unsigned char https_key_start[] asm("_binary_ssl_prvtkey_pem_start");
   extern const unsigned char https_key_end[] asm("_binary_ssl_prvtkey_pem_end");
-  https_config.cacert_pem            = https_cert_start;
-  https_config.cacert_len            = https_cert_end - https_cert_start;
-  https_config.prvtkey_pem           = https_key_start;
-  https_config.prvtkey_len           = https_key_end - https_key_start;
-  https_config.httpd.global_user_ctx = this;
-  http_config.global_user_ctx        = this;
-  // https_config.httpd.global_user_ctx_free_fn = free_context;
-  https_config.httpd.stack_size = 25 * 1024;
-  http_config.stack_size        = 25 * 1024;
+
+  https_config.cacert_pem  = https_cert_start;
+  https_config.cacert_len  = https_cert_end - https_cert_start;
+  https_config.prvtkey_pem = https_key_start;
+  https_config.prvtkey_len = https_key_end - https_key_start;
+#else
+  https_config.transport_mode = HTTPD_SSL_TRANSPORT_INSECURE;
+#endif
 
   httpd_uri_t info_uri        = {.uri = "/info", .method = HTTP_GET, .handler = info_wrapper};
   httpd_uri_t enableota_uri   = {.uri = "/enableOTA", .method = HTTP_POST, .handler = enableota_wrapper};
@@ -58,8 +59,7 @@ void WebTask::worker() {
   httpd_uri_t root_uri        = {.uri = "/", .method = HTTP_GET, .handler = root_wrapper};
   httpd_uri_t packets_log_uri = {.uri = "/packets.log", .method = HTTP_GET, .handler = download_packets_logs_wrapper};
 
-  esp_err_t ret = httpd_ssl_start(&httpd_handle, &https_config);
-  // esp_err_t ret   = httpd_start(&httpd_handle, &http_config);
+  esp_err_t ret   = httpd_ssl_start(&httpd_handle, &https_config);
   isServerStarted = true;
 
   APP_LOGD(getName(), "httpd_ssl_start returned %d", ret);
