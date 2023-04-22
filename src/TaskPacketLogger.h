@@ -23,7 +23,7 @@ public:
   bool   getFullLogs(httpd_req_t *req);
 
 private:
-  void rotate();
+  bool rotate();
 
   size_t         _nb_lines;
   size_t         _nb_files;

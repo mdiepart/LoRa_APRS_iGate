@@ -126,13 +126,17 @@ void PacketLoggerTask::worker() {
     gmtime_r(&entry.rxTime, &timeInfo);
 
     if (_counter >= _nb_lines) {
-      rotate();
+      if (!rotate()) {
+        while (true) {
+          vTaskDelay(portMAX_DELAY);
+        }
+      }
       _counter = 0;
     }
     csv_file = SPIFFS.open("/" + _filename, "a");
     if (!csv_file) {
       APP_LOGE(getName(), "Could not open csv file to log packets...");
-      _stateInfo = "File error";
+      _stateInfo = "Could not open csv file to log packets";
       _state     = Error;
       return;
     }
@@ -193,10 +197,14 @@ void PacketLoggerTask::worker() {
   }
 }
 
-void PacketLoggerTask::rotate() {
+bool PacketLoggerTask::rotate() {
   if (_nb_files == 0) {
-    SPIFFS.remove("/" + _filename);
-    return;
+    if (SPIFFS.remove("/" + _filename) == ESP_OK) {
+      return true;
+    } else {
+      _stateInfo = String("(") + __FILE__ + ":" + __LINE__ + ") Could not remove file.";
+      return false;
+    }
   }
 
   // Remove oldest file if it exists
@@ -204,30 +212,48 @@ void PacketLoggerTask::rotate() {
   char origin_file[32] = {0};
   snprintf(origin_file, 32, "/%s.%zu", _filename.c_str(), _nb_files - 1);
 
-  if (SPIFFS.remove(origin_file) == ESP_OK) {
-    APP_LOGD(getName(), "Deleted file %s.", origin_file);
-  } else {
-    // File might not exist, in this case, remove will return ESP_ERR_NVS_NOT_FOUND
-    APP_LOGD(getName(), "Could not delete file %s.", origin_file);
+  if (SPIFFS.exists(origin_file)) {
+    if (SPIFFS.remove(origin_file) == true) {
+      APP_LOGD(getName(), "Deleted file %s.", origin_file);
+    } else {
+      APP_LOGE(getName(), "Error deleting file %s.", origin_file);
+      _stateInfo = String("(") + __FILE__ + ":" + __LINE__ + ") Could not delete file.";
+      return false;
+    }
   }
 
   for (int i = _nb_files - 1; i > 0; i--) {
     snprintf(origin_file, 32, "/%s.%d", _filename.c_str(), i - 1);
     snprintf(target_file, 32, "/%s.%d", _filename.c_str(), i);
     if (SPIFFS.exists(origin_file)) {
-      SPIFFS.rename(origin_file, target_file);
-      APP_LOGD(getName(), "Moved file %s to %s.", origin_file, target_file);
+      if (SPIFFS.rename(origin_file, target_file) == false) {
+        APP_LOGE(getName(), "Error while renaming file %s to %s.", origin_file, target_file);
+        _stateInfo = String("(") + __FILE__ + ":" + __LINE__ + ") Could not rename file.";
+        return false;
+      } else {
+        APP_LOGD(getName(), "Moved file %s to %s.", origin_file, target_file);
+      }
     }
   }
 
   snprintf(origin_file, 32, "/%s", _filename.c_str());
   snprintf(target_file, 32, "/%s.0", _filename.c_str());
 
-  SPIFFS.rename(origin_file, target_file);
+  if (!SPIFFS.rename(origin_file, target_file)) {
+    APP_LOGE(getName(), "Error while renaming file %s to %s.", origin_file, target_file);
+    _stateInfo = String("(") + __FILE__ + ":" + __LINE__ + ") Could not rename file.";
+    return false;
+  }
 
   File csv_file = SPIFFS.open(origin_file, "w", true);
+  if (!csv_file) {
+    _stateInfo = String("(") + __FILE__ + ":" + __LINE__ + ") Could not open file.";
+    return false;
+  }
   csv_file.println(HEADER);
   csv_file.close();
+
+  return true;
 }
 
 String PacketLoggerTask::getTail(bool use_cache) {
