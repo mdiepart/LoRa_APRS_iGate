@@ -155,12 +155,47 @@ void setup() {
   displayTask = new DisplayTask(1, 0, true, LoRaSystem, toDisplay, VERSION);
   LoRaSystem.getTaskManager().addFreeRTOSTask(displayTask);
 
-  modemTask = new RadiolibTask(5, 0, false, LoRaSystem, fromModem, toModem, toPacketLogger, toDisplay);
-  LoRaSystem.getTaskManager().addFreeRTOSTask(modemTask);
-  routerTask = new RouterTask(4, 0, false, LoRaSystem, fromModem, toModem, toAprsIs, toMQTT);
-  LoRaSystem.getTaskManager().addFreeRTOSTask(routerTask);
-  beaconTask = new BeaconTask(3, 0, true, LoRaSystem, toModem, toAprsIs, toDisplay);
-  LoRaSystem.getTaskManager().addFreeRTOSTask(beaconTask);
+  if (LoRaSystem.getUserConfig()->callsign == "NOCALL-10") {
+    APP_LOGE("Main", "You have to change your settings in 'data/is-cfg.json' and upload it via 'Upload File System image'!");
+    extern const unsigned char wifi_credentials_start[] asm("_binary_recovery_wifi_credentials_start");
+    extern const unsigned char wifi_credentials_end[] asm("_binary_recovery_wifi_credentials_end");
+
+    if (wifi_credentials_end - wifi_credentials_start <= 0) {
+      APP_LOGE("Main", "Could not find recovery wifi credentials.");
+    } else {
+      APP_LOGE("Main", "Found recovery wifi credentials, enabling recovery mode. Only wifi and OTA will be enabled.");
+      String wifiCredentials = String((const char *)wifi_credentials_start);
+      String APName          = wifiCredentials.substring(0, wifiCredentials.indexOf("\n"));
+      String APPassword      = wifiCredentials.substring(wifiCredentials.indexOf("\n") + 1, wifiCredentials.lastIndexOf("\n"));
+      APP_LOGE("Main", "AP Name is %s. AP Password is %s.", APName.c_str(), APPassword.c_str());
+
+      APName.trim();
+      APPassword.trim();
+      Configuration::Wifi::AP ap;
+      ap.SSID     = APName;
+      ap.password = APPassword;
+      userConfig.wifi.APs.push_back(ap);
+
+      userConfig.aprs_is.active      = false;
+      userConfig.digi.active         = false;
+      userConfig.ftp.active          = false;
+      userConfig.mqtt.active         = false;
+      userConfig.ota.active          = true;
+      userConfig.packetLogger.active = false;
+      userConfig.syslog.active       = false;
+      userConfig.web.active          = false;
+      userConfig.wifi.active         = true;
+
+      APP_LOGE("Main", "Please upload configuration using \"Upload Filesystem Image\" or OTA update (no password, port 3232).");
+    }
+  } else {
+    modemTask = new RadiolibTask(5, 0, false, LoRaSystem, fromModem, toModem, toPacketLogger, toDisplay);
+    LoRaSystem.getTaskManager().addFreeRTOSTask(modemTask);
+    routerTask = new RouterTask(4, 0, false, LoRaSystem, fromModem, toModem, toAprsIs, toMQTT);
+    LoRaSystem.getTaskManager().addFreeRTOSTask(routerTask);
+    beaconTask = new BeaconTask(3, 0, true, LoRaSystem, toModem, toAprsIs, toDisplay);
+    LoRaSystem.getTaskManager().addFreeRTOSTask(beaconTask);
+  }
 
   bool tcpip = false;
 
@@ -220,17 +255,8 @@ void setup() {
     sntp_init();
   }
 
-  if (userConfig.callsign == "NOCALL-10") {
-    APP_LOGE(MODULE_NAME, "You have to change your settings in 'data/is-cfg.json' and upload it via 'Upload File System image'!");
-    // LoRaSystem.getDisplay().showStatusScreen("ERROR", "You have to change your settings in 'data/is-cfg.json' and upload it via \"Upload File System image\"!");
-    while (true)
-      ;
-  }
   if ((!userConfig.aprs_is.active) && !(userConfig.digi.active)) {
     APP_LOGE(MODULE_NAME, "No mode selected (iGate or Digi)! You have to activate one of iGate or Digi.");
-    // LoRaSystem.getDisplay().showStatusScreen("ERROR", "No mode selected (iGate or Digi)! You have to activate one of iGate or Digi.");
-    while (true)
-      ;
   }
 
   if (userConfig.display.overwritePin != 0) {
