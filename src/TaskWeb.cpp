@@ -101,7 +101,6 @@ void WebTask::worker() {
 }
 
 String WebTask::loadPage(String file) const {
-  SPIFFS.begin();
   String pageString;
   File   pageFile = SPIFFS.open(file);
   if (!pageFile || !SPIFFS.exists(file)) {

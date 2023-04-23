@@ -96,7 +96,7 @@ void ProjectConfigurationManagement::readProjectConfiguration(DynamicJsonDocumen
   if (data["mqtt"].containsKey("topic"))
     conf.mqtt.topic = data["mqtt"]["topic"].as<String>();
 
-  conf.syslog.active = data["syslog"]["active"] | true;
+  conf.syslog.active = data["syslog"]["active"] | false;
   if (data["syslog"].containsKey("server"))
     conf.syslog.server = data["syslog"]["server"].as<String>();
   conf.syslog.port = data["syslog"]["port"] | 514;

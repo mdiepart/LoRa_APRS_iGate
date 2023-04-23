@@ -3,7 +3,8 @@
 [![Integration Tests](https://github.com/mdiepart/LoRa_APRS_iGate/actions/workflows/build_check.yml/badge.svg)](https://github.com/mdiepart/LoRa_APRS_iGate/actions/workflows/build_check.yml)
 
 The LoRa APRS iGate will work with very cheap hardware which you can buy from amazon, ebay or aliexpress.
-Try it out and be part of the APRS network.
+Try it out and be part of the APRS network.  
+This particular version is modified and optimized for remote deployments and data acquisition on the received packets. It also provides an HTTP/HTTPS web interface to access the device.
 
 ![TTGO LoRa32](pics/iGate.png)
 
@@ -88,7 +89,7 @@ so the version will be: 20.46.0
 
 ## Internal Web Server
 
-The internal webserver, if enabled in the configuration, allows you to update the module remotely and check the state of the various services.
+The internal webserver, if enabled in the configuration, allows you to update the module remotely and check the state of the various services. Instructions are available [here](./ssl/enable_HTTPS.md) describing how to enable HTTPS protocol for the web server.
 
 ### Updating the igate via the web server
 
@@ -98,11 +99,13 @@ To update the firmware, click on "Upload Firmware", select the `firmware.bin` fi
 
 To update the SPIFFS filesystem, click on "Upload SPIFFS", select the `spiffs.bin` file that PlatformIO generated (in the project folder, under `./.pio/build/lora_board/spiffs.bin`). Then click "Upload".
 
-**Warning** As of now, trying to upload both files at the same time WILL NOT work. When updating the device, upload the SPIFFS file before the firmware file.
-
 ## Packet logger
 
 A packet logger can be enabled in the configuration. It will store the latest packets received along with some more data (RSSI, SNR and frequency error of the reception). If a packet is recevived with incorrect data (an incorrect CRC check), a log line will be added with the RSSI, SNR and frequency_error of that transmission.
+
+## Recovery
+
+In order to enable recovery of a remote iGate that could have lost its configuratio during a firmware upgrade, a recovery functionality have been added. More details can be found [here](./recovery/recovery.md)
 
 ## Future plans
 
@@ -119,7 +122,7 @@ A packet logger can be enabled in the configuration. It will store the latest pa
 
 ## LoRa Tracker
 
-Look at my other project: a [LoRa Tracker](https://github.com/peterus/LoRa_APRS_Tracker)
+Look at OE5BPA's original tracker project: a [LoRa Tracker](https://github.com/peterus/LoRa_APRS_Tracker)
 
 ## Hints
 
@@ -132,8 +135,6 @@ versions on the market.
 For direct mount you need a display with this Pinout -> [VCC - GND - SCL - SDA](pics/display-right.jpg).
 A direct mount of the [other display](pics/display-wrong.jpg) is not possible without damage the display!
 The 'wrong' display works too but you have to change VCC and GND by wire !
-
-The [LoRa APRS WiKi Displays](https://github.com/lora-aprs/LoRa_APRS_Tracker/wiki/Displays) page has more details.
 
 Feel free to add hints!
 
