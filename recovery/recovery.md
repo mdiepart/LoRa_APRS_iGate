@@ -9,4 +9,3 @@ This folder contains files which will hardcode settings in the firmware. This al
 1) Edit the file named `wifi_credentials`
 2) First line must contain the access point name  
    Second line must contain the access point network
-3) Uncomment line 
