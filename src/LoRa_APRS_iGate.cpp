@@ -54,7 +54,7 @@ void setup() {
   esp_task_wdt_add(NULL);
   Serial.begin(115200);
   delay(500);
-  APP_LOGI(MODULE_NAME, "LoRa APRS iGate by OE5BPA (Peter Buchegger)");
+  APP_LOGI(MODULE_NAME, "LoRa APRS iGate by ON4MOD Morgan Diepart.\n\t Original work by OE5BPA Peter Buchegger.");
   APP_LOGI(MODULE_NAME, "Version: %s", VERSION);
 
   switch (esp_reset_reason()) {
@@ -178,13 +178,13 @@ void setup() {
 
       userConfig.aprs_is.active      = false;
       userConfig.digi.active         = false;
-      userConfig.ftp.active          = false;
-      userConfig.mqtt.active         = false;
       userConfig.ota.active          = true;
       userConfig.packetLogger.active = false;
-      userConfig.syslog.active       = false;
       userConfig.web.active          = false;
       userConfig.wifi.active         = true;
+      userConfig.ota.enableViaWeb    = false;
+      userConfig.ota.password        = "";
+      userConfig.ota.port            = 3223;
 
       APP_LOGE("Main", "Please upload configuration using \"Upload Filesystem Image\" or OTA update (no password, port 3232).");
     }
