@@ -156,18 +156,18 @@ void setup() {
   LoRaSystem.getTaskManager().addFreeRTOSTask(displayTask);
 
   if (LoRaSystem.getUserConfig()->callsign == "NOCALL-10") {
-    APP_LOGE("Main", "You have to change your settings in 'data/is-cfg.json' and upload it via 'Upload File System image'!");
+    APP_LOGE(MODULE_NAME, "You have to change your settings in 'data/is-cfg.json' and upload it via 'Upload File System image'!");
     extern const unsigned char wifi_credentials_start[] asm("_binary_recovery_wifi_credentials_start");
     extern const unsigned char wifi_credentials_end[] asm("_binary_recovery_wifi_credentials_end");
 
     if (wifi_credentials_end - wifi_credentials_start <= 0) {
-      APP_LOGE("Main", "Could not find recovery wifi credentials.");
+      APP_LOGE(MODULE_NAME, "Could not find recovery wifi credentials.");
     } else {
-      APP_LOGE("Main", "Found recovery wifi credentials, enabling recovery mode. Only wifi and OTA will be enabled.");
+      APP_LOGE(MODULE_NAME, "Found recovery wifi credentials, enabling recovery mode. Only wifi and OTA will be enabled.");
       String wifiCredentials = String((const char *)wifi_credentials_start);
       String APName          = wifiCredentials.substring(0, wifiCredentials.indexOf("\n"));
       String APPassword      = wifiCredentials.substring(wifiCredentials.indexOf("\n") + 1, wifiCredentials.lastIndexOf("\n"));
-      APP_LOGE("Main", "AP Name is %s. AP Password is %s.", APName.c_str(), APPassword.c_str());
+      APP_LOGE(MODULE_NAME, "AP Name is %s. AP Password is %s.", APName.c_str(), APPassword.c_str());
 
       APName.trim();
       APPassword.trim();
@@ -186,7 +186,7 @@ void setup() {
       userConfig.ota.password        = "";
       userConfig.ota.port            = 3223;
 
-      APP_LOGE("Main", "Please upload configuration using \"Upload Filesystem Image\" or OTA update (no password, port 3232).");
+      APP_LOGE(MODULE_NAME, "Please upload configuration using \"Upload Filesystem Image\" or OTA update (no password, port 3232).");
     }
   } else {
     modemTask = new RadiolibTask(5, 0, false, LoRaSystem, fromModem, toModem, toPacketLogger, toDisplay);
